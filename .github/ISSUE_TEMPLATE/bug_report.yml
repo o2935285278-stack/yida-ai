@@ -1,0 +1,32 @@
+name: Bug report
+description: Report a reproducible, sanitized problem
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include API keys, private captions, personal data or documents.
+  - type: input
+    id: version
+    attributes:
+      label: Yida AI version
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Prefer the public mock adapter and fictional data.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Sanitized environment
+      description: Windows/Python/LiveCaptions Translator versions; omit usernames and paths.
