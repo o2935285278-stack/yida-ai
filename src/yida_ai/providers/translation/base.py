@@ -10,7 +10,7 @@ class TranslationProvider(ABC):
 
 
 class PassthroughTranslationProvider(TranslationProvider):
-    """Used when the caption adapter already supplied translated text."""
+    """Used when the caption source already supplied translated text."""
 
     def translate(self, text: str, source_language: str, target_language: str) -> str:
         return text

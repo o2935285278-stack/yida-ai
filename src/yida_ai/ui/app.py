@@ -38,7 +38,7 @@ class YidaApp:
         self._refresh_knowledge_list()
         self._refresh_status()
         self.root.protocol("WM_DELETE_WINDOW", self.close)
-        self.root.after(self.runtime.settings.adapter.poll_interval_ms, self._tick)
+        self.root.after(self.runtime.settings.caption_source.poll_interval_ms, self._tick)
         if not self.settings_store.path.exists():
             self.root.after(250, self._show_first_run)
 
@@ -134,7 +134,7 @@ class YidaApp:
         self.reply_mode = StringVar()
         self.reply_length = StringVar()
         self.context_turns = IntVar(value=15)
-        self.adapter_kind = StringVar()
+        self.caption_source_kind = StringVar()
         self.database_path = StringVar()
         self.ai_provider = StringVar()
         self.api_url = StringVar()
@@ -143,7 +143,7 @@ class YidaApp:
         self.save_history = BooleanVar(value=True)
         self.retention_days = IntVar(value=30)
         rows = [
-            ("字幕来源", self.adapter_kind, ("livecaptions-translator", "mock")),
+            ("字幕来源", self.caption_source_kind, ("livecaptions-translator", "mock")),
             ("源语言", self.source_language, tuple(LANGUAGES)),
             ("用户阅读语言", self.user_language, tuple(LANGUAGES)),
             ("回答语言", self.reply_language, tuple(LANGUAGES)),
@@ -237,8 +237,8 @@ class YidaApp:
         self.reply_mode.set(settings.reply_mode)
         self.reply_length.set(settings.reply_length)
         self.context_turns.set(settings.context_turns)
-        self.adapter_kind.set(settings.adapter.kind)
-        self.database_path.set(settings.adapter.database_path)
+        self.caption_source_kind.set(settings.caption_source.kind)
+        self.database_path.set(settings.caption_source.database_path)
         self.ai_provider.set(settings.llm.provider)
         self.api_url.set(settings.llm.api_url)
         self.model.set(settings.llm.model)
@@ -255,8 +255,8 @@ class YidaApp:
         settings.reply_mode = self.reply_mode.get()
         settings.reply_length = self.reply_length.get()
         settings.context_turns = self.context_turns.get()
-        settings.adapter.kind = self.adapter_kind.get()
-        settings.adapter.database_path = self.database_path.get().strip()
+        settings.caption_source.kind = self.caption_source_kind.get()
+        settings.caption_source.database_path = self.database_path.get().strip()
         settings.llm.provider = self.ai_provider.get()
         settings.llm.api_url = self.api_url.get().strip()
         settings.llm.model = self.model.get().strip()
@@ -372,7 +372,7 @@ class YidaApp:
             self._show_result(result)
         if update.errors:
             self.source_status.set(f"字幕来源：异常 · {update.errors[-1]}")
-        self.root.after(self.runtime.settings.adapter.poll_interval_ms, self._tick)
+        self.root.after(self.runtime.settings.caption_source.poll_interval_ms, self._tick)
 
     def _show_caption(self, event: CaptionEvent) -> None:
         self._write_timeline(f"\n原始字幕 [{event.source_language}]\n", "heading")
@@ -417,7 +417,7 @@ class YidaApp:
         self.timeline.see("end")
 
     def _refresh_status(self) -> None:
-        status = self.runtime.controller.adapter.status()
+        status = self.runtime.controller.source.status()
         self.source_status.set(f"字幕来源：{status.source_name} · {status.detail}")
         settings = self.runtime.settings
         source_name = language_name(settings.source_language)

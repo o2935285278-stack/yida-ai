@@ -31,7 +31,7 @@ class LLMSettings:
 
 
 @dataclass(slots=True)
-class AdapterSettings:
+class CaptionSourceSettings:
     kind: str = "livecaptions-translator"
     database_path: str = ""
     poll_interval_ms: int = 180
@@ -54,7 +54,7 @@ class AppSettings:
     reply_length: str = "short"
     context_turns: int = 15
     llm: LLMSettings = field(default_factory=LLMSettings)
-    adapter: AdapterSettings = field(default_factory=AdapterSettings)
+    caption_source: CaptionSourceSettings = field(default_factory=CaptionSourceSettings)
     privacy: PrivacySettings = field(default_factory=PrivacySettings)
 
     def validate(self) -> None:
@@ -95,8 +95,13 @@ class SettingsStore:
 
 
 def _settings_from_dict(raw: dict[str, Any]) -> AppSettings:
-    values = {key: value for key, value in raw.items() if key not in {"llm", "adapter", "privacy"}}
+    values = {
+        key: value
+        for key, value in raw.items()
+        if key not in {"llm", "adapter", "caption_source", "privacy"}
+    }
     values["llm"] = LLMSettings(**raw.get("llm", {}))
-    values["adapter"] = AdapterSettings(**raw.get("adapter", {}))
+    source_values = raw.get("caption_source", raw.get("adapter", {}))
+    values["caption_source"] = CaptionSourceSettings(**source_values)
     values["privacy"] = PrivacySettings(**raw.get("privacy", {}))
     return AppSettings(**values)

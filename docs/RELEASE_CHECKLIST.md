@@ -2,8 +2,8 @@
 
 - [x] Independent sanitized `yida-ai` directory; original private project unchanged
 - [x] Apache-2.0 upstream license verified; attribution and modifications documented
-- [x] LiveCaptions Translator default adapter isolated behind `CaptionEvent`
-- [x] Mock adapter and public fictional fixtures
+- [x] `CaptionSource` contract with isolated `LiveCaptionsTranslatorSource`
+- [x] `MockCaptionSource` and public fictional fixtures
 - [x] Generic languages, scenes, four reply modes and configurable context
 - [x] OpenAI-compatible and mock providers; no serialized key or real API tests
 - [x] TXT/Markdown retrieval and experimental PDF extraction with citations
@@ -13,7 +13,7 @@
 - [x] Automated coverage of the 25 requested validation areas
 - [x] English and Chinese install/privacy/limitation documentation
 - [x] Windows build script, smoke script and GitHub Actions workflow
-- [x] Clean virtual-environment install, 40 tests, lint, build and packaged smoke passed
+- [x] Clean virtual-environment install, 42 tests, lint, build and packaged smoke passed
 - [x] Sensitive-data, license, dependency and maintainability audit completed
 - [x] Local Git repository contains only public files and has a release-preparation commit
 

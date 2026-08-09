@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 
 from yida_ai import __version__
-from yida_ai.adapters.captions.mock import MockCaptionAdapter
+from yida_ai.adapters.captions.mock import MockCaptionSource
 from yida_ai.application import build_runtime
 from yida_ai.config.settings import SettingsStore
 from yida_ai.ui import run_gui
@@ -28,7 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def run_headless_demo(store: SettingsStore, mock_path: Path) -> int:
     runtime = build_runtime(store, mock_caption_path=mock_path)
-    runtime.settings.adapter.kind = "mock"
+    runtime.settings.caption_source.kind = "mock"
     runtime.settings.llm.provider = "mock"
     deadline = time.monotonic() + 5
     output: list[dict[str, object]] = []
@@ -45,9 +45,9 @@ def run_headless_demo(store: SettingsStore, mock_path: Path) -> int:
                         "sources": [item.document_name for item in result.suggestion.citations],
                     }
                 )
-        adapter = runtime.controller.adapter
-        adapter_empty = isinstance(adapter, MockCaptionAdapter) and adapter.remaining == 0
-        if adapter_empty and runtime.controller.engine.queue_size == 0:
+        source = runtime.controller.source
+        source_empty = isinstance(source, MockCaptionSource) and source.remaining == 0
+        if source_empty and runtime.controller.engine.queue_size == 0:
             update = runtime.controller.flush()
             for result in update.results:
                 if result.suggestion:

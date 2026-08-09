@@ -6,9 +6,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from yida_ai.adapters.captions.base import (
-    AdapterStatus,
-    AdapterUnavailable,
-    CaptionAdapter,
+    CaptionSource,
+    CaptionSourceStatus,
+    CaptionSourceUnavailable,
 )
 from yida_ai.core.models import CaptionEvent
 
@@ -44,11 +44,11 @@ def detect_database_path(explicit: str | Path | None = None) -> Path | None:
     return next((path for path in common_database_candidates() if path.is_file()), None)
 
 
-class LiveCaptionsTranslatorAdapter(CaptionAdapter):
+class LiveCaptionsTranslatorSource(CaptionSource):
     """Read translated caption rows behind a stable CaptionEvent interface.
 
     All knowledge of the upstream SQLite schema is intentionally confined here.
-    The adapter never reads the upstream API configuration and never terminates
+    The source never reads the upstream API configuration and never terminates
     or starts the upstream process.
     """
 
@@ -68,22 +68,22 @@ class LiveCaptionsTranslatorAdapter(CaptionAdapter):
         if self.database_path and follow_new:
             self.last_row_id = self._max_id()
 
-    def status(self) -> AdapterStatus:
+    def status(self) -> CaptionSourceStatus:
         if self.database_path is None:
-            return AdapterStatus(
+            return CaptionSourceStatus(
                 False,
                 "LiveCaptions Translator",
                 "未找到 translation_history.db。请在设置中选择数据库文件。",
             )
         try:
             self._resolve_columns()
-        except AdapterUnavailable as exc:
-            return AdapterStatus(False, "LiveCaptions Translator", str(exc))
-        return AdapterStatus(True, "LiveCaptions Translator", str(self.database_path))
+        except CaptionSourceUnavailable as exc:
+            return CaptionSourceStatus(False, "LiveCaptions Translator", str(exc))
+        return CaptionSourceStatus(True, "LiveCaptions Translator", str(self.database_path))
 
     def poll(self, limit: int = 50) -> list[CaptionEvent]:
         if self.database_path is None:
-            raise AdapterUnavailable(
+            raise CaptionSourceUnavailable(
                 "未检测到 LiveCaptions Translator 数据库；可切换到模拟字幕模式进行演示。"
             )
         columns = self._resolve_columns()
@@ -97,7 +97,7 @@ class LiveCaptionsTranslatorAdapter(CaptionAdapter):
             with self._connect_readonly() as connection:
                 rows = connection.execute(query, (self.last_row_id, limit)).fetchall()
         except sqlite3.Error as exc:
-            raise AdapterUnavailable(f"字幕数据库无法读取：{exc}") from exc
+            raise CaptionSourceUnavailable(f"字幕数据库无法读取：{exc}") from exc
         events: list[CaptionEvent] = []
         for row_id, source, translated, timestamp in rows:
             self.last_row_id = max(self.last_row_id, int(row_id))
@@ -128,7 +128,7 @@ class LiveCaptionsTranslatorAdapter(CaptionAdapter):
             uri = self.database_path.resolve().as_uri() + "?mode=ro"
             return sqlite3.connect(uri, uri=True, timeout=0.4)
         except (OSError, sqlite3.Error) as exc:
-            raise AdapterUnavailable(f"无法打开字幕数据库：{exc}") from exc
+            raise CaptionSourceUnavailable(f"无法打开字幕数据库：{exc}") from exc
 
     def _max_id(self) -> int:
         try:
@@ -138,14 +138,14 @@ class LiveCaptionsTranslatorAdapter(CaptionAdapter):
                     f'SELECT COALESCE(MAX("{columns["id"]}"), 0) FROM "{columns["table"]}"'
                 ).fetchone()
             return int(row[0])
-        except AdapterUnavailable:
+        except CaptionSourceUnavailable:
             return 0
 
     def _resolve_columns(self) -> dict[str, str]:
         if self._columns is not None:
             return self._columns
         if self.database_path is None:
-            raise AdapterUnavailable("LiveCaptions Translator 数据库路径尚未配置")
+            raise CaptionSourceUnavailable("LiveCaptions Translator 数据库路径尚未配置")
         try:
             with self._connect_readonly() as connection:
                 tables = [
@@ -172,8 +172,8 @@ class LiveCaptionsTranslatorAdapter(CaptionAdapter):
                             self._columns["timestamp"] = timestamp
                         return self._columns
         except sqlite3.DatabaseError as exc:
-            raise AdapterUnavailable(f"字幕数据库已损坏或格式无效：{exc}") from exc
-        raise AdapterUnavailable("数据库中没有可识别的字幕历史表")
+            raise CaptionSourceUnavailable(f"字幕数据库已损坏或格式无效：{exc}") from exc
+        raise CaptionSourceUnavailable("数据库中没有可识别的字幕历史表")
 
 
 def _first(mapping: dict[str, str], *keys: str) -> str | None:

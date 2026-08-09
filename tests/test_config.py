@@ -44,3 +44,16 @@ def test_corrupted_config_has_clear_error(tmp_path):
     path.write_text("{broken", encoding="utf-8")
     with pytest.raises(ValueError, match="配置文件无法读取"):
         SettingsStore(path, tmp_path).load()
+
+
+def test_legacy_adapter_config_migrates_to_caption_source(tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text('{"adapter":{"kind":"mock","poll_interval_ms":250}}', encoding="utf-8")
+    settings = SettingsStore(path, tmp_path).load()
+    assert settings.caption_source.kind == "mock"
+    assert settings.caption_source.poll_interval_ms == 250
+
+    SettingsStore(path, tmp_path).save(settings)
+    saved = path.read_text(encoding="utf-8")
+    assert '"caption_source"' in saved
+    assert '"adapter"' not in saved

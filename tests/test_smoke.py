@@ -1,5 +1,5 @@
 from yida_ai.__main__ import main
-from yida_ai.config.settings import AdapterSettings, AppSettings, SettingsStore
+from yida_ai.config.settings import AppSettings, CaptionSourceSettings, SettingsStore
 from yida_ai.ui.app import YidaApp
 
 
@@ -18,7 +18,7 @@ def test_gui_window_starts_and_closes_cleanly(tmp_path):
     from tkinter import Tk
 
     store = SettingsStore(tmp_path / "config.json", tmp_path)
-    store.save(AppSettings(adapter=AdapterSettings(kind="mock")))
+    store.save(AppSettings(caption_source=CaptionSourceSettings(kind="mock")))
     root = Tk()
     root.withdraw()
     app = YidaApp(root, store)

@@ -2,8 +2,9 @@ import sqlite3
 
 import pytest
 
-from yida_ai.adapters.captions.base import AdapterUnavailable
-from yida_ai.adapters.captions.livecaptions_translator import LiveCaptionsTranslatorAdapter
+from yida_ai.adapters.captions.base import CaptionSource, CaptionSourceUnavailable
+from yida_ai.adapters.captions.livecaptions_translator import LiveCaptionsTranslatorSource
+from yida_ai.adapters.captions.mock import MockCaptionSource
 
 
 def _make_upstream_db(path):
@@ -18,13 +19,18 @@ def _make_upstream_db(path):
         )
 
 
-def test_livecaptions_adapter_reads_stable_caption_event(tmp_path):
+def test_caption_source_contract_has_both_implementations():
+    assert issubclass(LiveCaptionsTranslatorSource, CaptionSource)
+    assert issubclass(MockCaptionSource, CaptionSource)
+
+
+def test_livecaptions_source_reads_stable_caption_event(tmp_path):
     path = tmp_path / "translation_history.db"
     _make_upstream_db(path)
-    adapter = LiveCaptionsTranslatorAdapter(
+    source = LiveCaptionsTranslatorSource(
         path, source_language="pt-BR", translated_language="zh-CN", follow_new=False
     )
-    event = adapter.poll()[0]
+    event = source.poll()[0]
     assert event.source_text == "Bom dia"
     assert event.translated_text == "早上好"
     assert event.source == "livecaptions-translator"
@@ -32,15 +38,15 @@ def test_livecaptions_adapter_reads_stable_caption_event(tmp_path):
 
 
 def test_livecaptions_missing_install_is_nonfatal(tmp_path):
-    adapter = LiveCaptionsTranslatorAdapter(tmp_path / "missing.db")
-    assert not adapter.status().available
-    with pytest.raises(AdapterUnavailable, match="未检测到"):
-        adapter.poll()
+    source = LiveCaptionsTranslatorSource(tmp_path / "missing.db")
+    assert not source.status().available
+    with pytest.raises(CaptionSourceUnavailable, match="未检测到"):
+        source.poll()
 
 
 def test_livecaptions_corrupt_database_is_reported(tmp_path):
     path = tmp_path / "broken.db"
     path.write_bytes(b"not a sqlite database")
-    adapter = LiveCaptionsTranslatorAdapter(path, follow_new=False)
-    with pytest.raises(AdapterUnavailable, match="损坏|无效"):
-        adapter.poll()
+    source = LiveCaptionsTranslatorSource(path, follow_new=False)
+    with pytest.raises(CaptionSourceUnavailable, match="损坏|无效"):
+        source.poll()

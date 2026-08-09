@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from yida_ai.adapters.captions import (
-    LiveCaptionsTranslatorAdapter,
-    MockCaptionAdapter,
+    LiveCaptionsTranslatorSource,
+    MockCaptionSource,
 )
 from yida_ai.config.settings import AppSettings, SettingsStore
 from yida_ai.core.captions import CaptionAssembler
@@ -42,15 +42,15 @@ def build_runtime(
     retriever = KeywordRetriever()
     retriever.index_directory(knowledge_library.directory)
 
-    if settings.adapter.kind == "mock" or mock_caption_path is not None:
-        adapter = (
-            MockCaptionAdapter.from_jsonl(mock_caption_path)
+    if settings.caption_source.kind == "mock" or mock_caption_path is not None:
+        caption_source = (
+            MockCaptionSource.from_jsonl(mock_caption_path)
             if mock_caption_path is not None
-            else MockCaptionAdapter()
+            else MockCaptionSource()
         )
     else:
-        adapter = LiveCaptionsTranslatorAdapter(
-            settings.adapter.database_path or None,
+        caption_source = LiveCaptionsTranslatorSource(
+            settings.caption_source.database_path or None,
             source_language=settings.source_language,
             translated_language=settings.user_language,
         )
@@ -89,7 +89,7 @@ def build_runtime(
         reply_length=settings.reply_length,
     )
     controller = ApplicationController(
-        adapter,
+        caption_source,
         CaptionAssembler(),
         engine,
         reply_mode=settings.reply_mode,

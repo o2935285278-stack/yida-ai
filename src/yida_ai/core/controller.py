@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from yida_ai.adapters.captions.base import AdapterUnavailable, CaptionAdapter
+from yida_ai.adapters.captions.base import CaptionSource, CaptionSourceUnavailable
 from yida_ai.core.captions import CaptionAssembler
 from yida_ai.core.engine import EngineResult, ReplyEngine, should_generate
 from yida_ai.core.models import CaptionEvent
@@ -18,13 +18,13 @@ class ControllerUpdate:
 class ApplicationController:
     def __init__(
         self,
-        adapter: CaptionAdapter,
+        source: CaptionSource,
         assembler: CaptionAssembler,
         engine: ReplyEngine,
         *,
         reply_mode: str = "every",
     ) -> None:
-        self.adapter = adapter
+        self.source = source
         self.assembler = assembler
         self.engine = engine
         self.reply_mode = reply_mode
@@ -36,8 +36,8 @@ class ApplicationController:
         errors: list[str] = []
         if not self.paused:
             try:
-                incoming = self.adapter.poll()
-            except AdapterUnavailable as exc:
+                incoming = self.source.poll()
+            except CaptionSourceUnavailable as exc:
                 incoming = []
                 errors.append(str(exc))
             for event in incoming:
@@ -68,7 +68,7 @@ class ApplicationController:
         self.engine.clear_session()
 
     def close(self) -> None:
-        self.adapter.close()
+        self.source.close()
         self.engine.shutdown()
 
     def _record_or_generate(self, event: CaptionEvent) -> None:

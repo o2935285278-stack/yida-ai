@@ -6,24 +6,26 @@ from dataclasses import dataclass
 from yida_ai.core.models import CaptionEvent
 
 
-class CaptionAdapterError(RuntimeError):
+class CaptionSourceError(RuntimeError):
     """Base error for caption sources."""
 
 
-class AdapterUnavailable(CaptionAdapterError):
+class CaptionSourceUnavailable(CaptionSourceError):
     """Raised when the configured caption source cannot be used."""
 
 
 @dataclass(frozen=True, slots=True)
-class AdapterStatus:
+class CaptionSourceStatus:
     available: bool
     source_name: str
     detail: str
 
 
-class CaptionAdapter(ABC):
+class CaptionSource(ABC):
+    """Uniform source of finalized caption and translation events."""
+
     @abstractmethod
-    def status(self) -> AdapterStatus:
+    def status(self) -> CaptionSourceStatus:
         raise NotImplementedError
 
     @abstractmethod

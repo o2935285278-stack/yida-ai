@@ -11,14 +11,18 @@ This is a **v0.1.0-beta** project. It is not a speech-recognition engine and doe
 ## Responsibilities
 
 - **Windows Live Captions** performs on-device speech recognition for system audio or microphone input.
-- **LiveCaptions Translator** is the default caption/translation source and stores the records read by the adapter.
+- **LiveCaptions Translator** is the default caption/translation source and stores the records read by `LiveCaptionsTranslatorSource`.
 - **Yida AI** adds caption normalization, deduplication, conversation context, document retrieval, AI reply suggestions, citations, privacy controls, history and export.
 
-No upstream source file is bundled or modified. The integration is an independent, read-only SQLite adapter. See [upstream attribution](docs/UPSTREAM.md) and [integration notes](docs/LIVECAPTIONS_TRANSLATOR.md).
+No upstream source file is bundled or modified. The companion integration is an
+independently written, read-only `LiveCaptionsTranslatorSource`. See
+[upstream attribution](docs/UPSTREAM.md) and
+[integration notes](docs/LIVECAPTIONS_TRANSLATOR.md).
 
 ## Features
 
-- Stable `CaptionEvent` interface plus LiveCaptions Translator and mock adapters
+- Uniform `CaptionSource` interface with `LiveCaptionsTranslatorSource` and
+  `MockCaptionSource`, both emitting stable `CaptionEvent` values
 - Original text, translation, current question, suggested reply, reply-language output and citations
 - General, business, sales, customer service, technical support, interview, language learning and custom scenes
 - Translation-only, automatic suggestion, every-caption suggestion and confirm-before-generate modes
@@ -90,7 +94,8 @@ Architecture, data flow and extension points are documented in [docs/ARCHITECTUR
 ## Known limitations
 
 - Windows 11 is the verified operating system; there is no direct microphone/STT engine in Yida AI.
-- LiveCaptions Translator database compatibility is isolated but upstream schema changes may require an adapter update.
+- LiveCaptions Translator database compatibility is isolated; an upstream schema
+  change requires updating only `LiveCaptionsTranslatorSource`.
 - Keyword retrieval is deterministic but less semantic than an embedding-based retriever.
 - PDF extraction works only for PDFs with extractable text and is marked experimental.
 - AI suggestions can be wrong. Verify facts and do not use them as professional, legal, medical or financial advice.

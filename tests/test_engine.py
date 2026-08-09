@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from yida_ai.adapters.captions.mock import MockCaptionAdapter
+from yida_ai.adapters.captions.mock import MockCaptionSource
 from yida_ai.core.captions import CaptionAssembler
 from yida_ai.core.controller import ApplicationController
 from yida_ai.core.conversation import ConversationManager
@@ -76,9 +76,9 @@ def test_clear_session_discards_stale_result(event_factory):
 
 
 def test_slow_or_failed_ai_does_not_block_caption_polling(event_factory):
-    adapter = MockCaptionAdapter([event_factory("slow")])
+    source = MockCaptionSource([event_factory("slow")])
     engine = _engine(DelayedProvider({"slow": 0.2}))
-    controller = ApplicationController(adapter, CaptionAssembler(settle_seconds=0), engine)
+    controller = ApplicationController(source, CaptionAssembler(settle_seconds=0), engine)
     try:
         started = time.monotonic()
         update = controller.tick(now=1)
@@ -110,7 +110,7 @@ def test_reply_modes_and_confirm_mode(event_factory):
     provider = MockLLMProvider()
     engine = _engine(provider)
     controller = ApplicationController(
-        MockCaptionAdapter([question]),
+        MockCaptionSource([question]),
         CaptionAssembler(settle_seconds=0),
         engine,
         reply_mode="confirm",

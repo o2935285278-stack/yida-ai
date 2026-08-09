@@ -5,7 +5,7 @@ Windows Live Captions
         |
 LiveCaptions Translator
         |
-LiveCaptionsTranslatorAdapter ---- MockCaptionAdapter
+LiveCaptionsTranslatorSource ---- MockCaptionSource
         |                              |
         +-------- CaptionEvent --------+
                        |
@@ -32,7 +32,8 @@ relevant chunks/citations     bounded worker queue
 
 ## Boundaries
 
-- `adapters/captions`: source-specific schemas and discovery. Core code sees only `CaptionEvent`.
+- `adapters/captions`: the `CaptionSource` contract plus source-specific schemas
+  and discovery. Core code sees only `CaptionEvent`.
 - `core`: normalization, conversation and concurrency; no UI or upstream database fields.
 - `providers`: replaceable LLM and future translation APIs.
 - `retrieval`: replaceable retrieval interface; current implementation is deterministic keyword ranking.

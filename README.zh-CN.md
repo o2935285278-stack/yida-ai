@@ -12,11 +12,14 @@
 - **LiveCaptions Translator**：第一版默认的字幕与翻译来源。
 - **译答 AI**：提供去重与断句、对话上下文、资料检索、AI 回复建议、引用、历史和隐私控制。
 
-公开仓库没有复制或修改上游源代码，只实现了独立的只读数据库适配器。详见[上游说明](docs/UPSTREAM.md)和[集成说明](docs/LIVECAPTIONS_TRANSLATOR.md)。
+公开仓库没有复制或修改上游源代码，只独立实现了只读的
+`LiveCaptionsTranslatorSource`，属于伴侣项目。详见
+[上游说明](docs/UPSTREAM.md)和[集成说明](docs/LIVECAPTIONS_TRANSLATOR.md)。
 
 ## 已实现功能
 
-- LiveCaptions Translator 默认适配器与离线模拟适配器
+- 统一 `CaptionSource` 接口，以及 `LiveCaptionsTranslatorSource` 和
+  `MockCaptionSource` 两种实现
 - 同时显示原文、翻译、当前问题、建议回复、目标语言回复和资料来源
 - 通用、商务、销售、客户服务、技术支持、面试、语言学习、自定义场景
 - 仅翻译、自动建议、每句建议、确认后生成四种模式
@@ -77,7 +80,7 @@ powershell -ExecutionPolicy Bypass -File scripts\check_sensitive.ps1
 ## 已知限制
 
 - 当前只正式验证 Windows 11；译答 AI 不直接读取麦克风，也不内置 STT。
-- 上游数据库结构若改变，可能需要更新适配器。
+- 上游数据库结构若改变，只需要更新 `LiveCaptionsTranslatorSource`。
 - 当前关键词检索稳定、可测试，但不等于语义检索。
 - PDF 只支持有可复制文字的文件，属于实验功能。
 - AI 建议可能出错；涉及事实、承诺或专业决策时必须人工核对。
