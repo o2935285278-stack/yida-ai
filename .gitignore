@@ -9,6 +9,7 @@ __pycache__/
 venv/
 .pytest_cache/
 .pytest-tmp/
+.pytest-tmp-*/
 .build-smoke-data*/
 .local-smoke/
 .ruff_cache/
@@ -18,8 +19,11 @@ build/
 dist/
 *.spec
 config.json
+setting.json
 /data/
 /knowledge/
 /exports/
 *.key
 *.pem
+*.dpapi
+api-key.*

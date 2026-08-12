@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from yida_ai.core.conversation import ConversationManager
 from yida_ai.core.models import CaptionEvent, ReplyRequest, ReplySuggestion
-from yida_ai.providers.llm.base import LLMProvider
+from yida_ai.providers.llm.base import LLMError, LLMProvider
 from yida_ai.retrieval.base import KnowledgeRetriever
 from yida_ai.storage.history import HistoryStore, StorageError
 
@@ -83,6 +83,7 @@ class ReplyEngine:
             raise RuntimeError("回复引擎已关闭")
         if record_event:
             self.conversation.add_event(event)
+            self._persist_event(event)
         citations = self.retriever.retrieve(
             f"{event.source_text}\n{event.translated_text}", limit=3
         )
@@ -113,6 +114,10 @@ class ReplyEngine:
                     pass
                 self._jobs.put_nowait(job)
         return request.request_id
+
+    def record_event(self, event: CaptionEvent) -> None:
+        self.conversation.add_event(event)
+        self._persist_event(event)
 
     def drain_results(self) -> list[EngineResult]:
         while True:
@@ -179,6 +184,14 @@ class ReplyEngine:
         for thread in self._threads:
             thread.join(timeout=timeout)
 
+    def _persist_event(self, event: CaptionEvent) -> None:
+        if self.history is None:
+            return
+        try:
+            self.history.save_event(self.conversation.session_id, event)
+        except StorageError:
+            LOGGER.warning("History event save failed for event %s", event.event_id)
+
     def _worker(self) -> None:
         while not self._closed:
             try:
@@ -192,11 +205,20 @@ class ReplyEngine:
                 suggestion = self.provider.generate(job.request)
                 result = EngineResult(job.sequence, job.generation, job.request, suggestion)
             except Exception as exc:
-                LOGGER.warning(
-                    "AI provider failed for request %s (%s)",
-                    job.request.request_id,
-                    type(exc).__name__,
-                )
+                if isinstance(exc, LLMError):
+                    LOGGER.warning(
+                        "AI provider failed for request %s: kind=%s status=%s message=%s",
+                        job.request.request_id,
+                        exc.kind.value,
+                        exc.status_code if exc.status_code is not None else "none",
+                        str(exc)[:300],
+                    )
+                else:
+                    LOGGER.warning(
+                        "AI provider failed for request %s (%s)",
+                        job.request.request_id,
+                        type(exc).__name__,
+                    )
                 result = EngineResult(
                     job.sequence,
                     job.generation,

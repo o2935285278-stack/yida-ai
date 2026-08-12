@@ -3,7 +3,10 @@ Copyright 2026 Yida AI contributors
 
 Licensed under the Apache License, Version 2.0.
 
-This project interoperates with LiveCaptions Translator, copyright 2024
-SakiRinn and contributors, through an independently implemented read-only
-adapter. No LiveCaptions Translator source file is included in this repository.
-See THIRD_PARTY_NOTICES.md for details.
+The Windows installer redistributes an unmodified LiveCaptions Translator
+executable, copyright 2024 SakiRinn and other contributors, under the Apache
+License 2.0. Yida AI independently implements its process manager, read-only
+adapter, conversation, retrieval and reply features. No upstream source file is
+copied or modified. The upstream authors do not endorse Yida AI.
+
+See THIRD_PARTY_NOTICES.md for component details.

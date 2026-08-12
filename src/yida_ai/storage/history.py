@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import json
 import sqlite3
+from contextlib import closing
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -37,26 +38,26 @@ class HistoryStore:
 
     def _initialize(self) -> None:
         try:
-            with self._connect() as connection:
+            with closing(self._connect()) as connection, connection:
                 connection.execute(
                     """
-                    CREATE TABLE IF NOT EXISTS turns (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        session_id TEXT NOT NULL,
-                        event_id TEXT NOT NULL UNIQUE,
-                        occurred_at TEXT NOT NULL,
-                        source_name TEXT NOT NULL,
-                        source_language TEXT NOT NULL,
-                        translated_language TEXT NOT NULL,
-                        source_text TEXT NOT NULL,
-                        translated_text TEXT NOT NULL,
-                        current_question TEXT NOT NULL,
-                        suggested_reply TEXT NOT NULL,
-                        translated_reply TEXT NOT NULL,
-                        evidence_status TEXT NOT NULL,
-                        citations_json TEXT NOT NULL
-                    )
-                    """
+                        CREATE TABLE IF NOT EXISTS turns (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            session_id TEXT NOT NULL,
+                            event_id TEXT NOT NULL UNIQUE,
+                            occurred_at TEXT NOT NULL,
+                            source_name TEXT NOT NULL,
+                            source_language TEXT NOT NULL,
+                            translated_language TEXT NOT NULL,
+                            source_text TEXT NOT NULL,
+                            translated_text TEXT NOT NULL,
+                            current_question TEXT NOT NULL,
+                            suggested_reply TEXT NOT NULL,
+                            translated_reply TEXT NOT NULL,
+                            evidence_status TEXT NOT NULL,
+                            citations_json TEXT NOT NULL
+                        )
+                        """
                 )
                 result = connection.execute("PRAGMA integrity_check").fetchone()[0]
                 if result != "ok":
@@ -78,7 +79,7 @@ class HistoryStore:
             for item in suggestion.citations
         ]
         try:
-            with self._connect() as connection:
+            with closing(self._connect()) as connection, connection:
                 connection.execute(
                     """
                     INSERT OR REPLACE INTO turns (
@@ -108,17 +109,31 @@ class HistoryStore:
             raise StorageError(f"保存历史失败：{exc}") from exc
         return True
 
-    def load_recent(self, limit: int = 15) -> list[tuple[str, CaptionEvent, ReplySuggestion]]:
+    def save_event(self, session_id: str, event: CaptionEvent) -> bool:
+        """Persist a caption immediately, even when AI is disabled or still running."""
+        suggestion = ReplySuggestion(
+            request_id=f"pending-{event.event_id}",
+            event_id=event.event_id,
+            current_question="",
+            suggested_reply="",
+            translated_reply="",
+            evidence_status=EvidenceStatus.NOT_FOUND,
+        )
+        return self.save(session_id, event, suggestion)
+
+    def load_recent(
+        self, limit: int = 15
+    ) -> list[tuple[str, CaptionEvent, ReplySuggestion | None]]:
         if not self.enabled or not self.path.exists():
             return []
         try:
-            with self._connect() as connection:
+            with closing(self._connect()) as connection:
                 rows = connection.execute(
                     "SELECT * FROM turns ORDER BY id DESC LIMIT ?", (limit,)
                 ).fetchall()
         except sqlite3.Error as exc:
             raise StorageError(f"读取历史失败：{exc}") from exc
-        result: list[tuple[str, CaptionEvent, ReplySuggestion]] = []
+        result: list[tuple[str, CaptionEvent, ReplySuggestion | None]] = []
         for row in reversed(rows):
             event = CaptionEvent(
                 event_id=row["event_id"],
@@ -132,15 +147,17 @@ class HistoryStore:
             citations = tuple(
                 KnowledgeCitation(**item) for item in json.loads(row["citations_json"])
             )
-            suggestion = ReplySuggestion(
-                request_id=f"history-{row['id']}",
-                event_id=event.event_id,
-                current_question=row["current_question"],
-                suggested_reply=row["suggested_reply"],
-                translated_reply=row["translated_reply"],
-                evidence_status=EvidenceStatus(row["evidence_status"]),
-                citations=citations,
-            )
+            suggestion = None
+            if row["current_question"] or row["suggested_reply"] or row["translated_reply"]:
+                suggestion = ReplySuggestion(
+                    request_id=f"history-{row['id']}",
+                    event_id=event.event_id,
+                    current_question=row["current_question"],
+                    suggested_reply=row["suggested_reply"],
+                    translated_reply=row["translated_reply"],
+                    evidence_status=EvidenceStatus(row["evidence_status"]),
+                    citations=citations,
+                )
             result.append((row["session_id"], event, suggestion))
         return result
 
@@ -148,7 +165,7 @@ class HistoryStore:
         if not self.path.exists():
             return
         try:
-            with self._connect() as connection:
+            with closing(self._connect()) as connection, connection:
                 connection.execute("DELETE FROM turns")
         except sqlite3.Error as exc:
             raise StorageError(f"清空历史失败：{exc}") from exc
@@ -158,7 +175,7 @@ class HistoryStore:
             return 0
         cutoff = (now or datetime.now(UTC)) - timedelta(days=self.retention_days)
         try:
-            with self._connect() as connection:
+            with closing(self._connect()) as connection, connection:
                 cursor = connection.execute(
                     "DELETE FROM turns WHERE occurred_at < ?", (cutoff.isoformat(),)
                 )
@@ -190,7 +207,7 @@ class HistoryStore:
         if not self.path.exists():
             return []
         try:
-            with self._connect() as connection:
+            with closing(self._connect()) as connection:
                 return connection.execute("SELECT * FROM turns ORDER BY id ASC").fetchall()
         except sqlite3.Error as exc:
             raise StorageError(f"导出历史失败：{exc}") from exc

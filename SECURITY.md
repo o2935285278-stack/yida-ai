@@ -11,7 +11,8 @@ Do not open a public issue containing API keys, private captions, documents or p
 ## Operational guidance
 
 - Install only from a trusted release or build from source.
-- Keep API keys in the process environment and rotate any accidentally exposed key.
+- Keep API keys in the process environment or use the in-app Windows DPAPI
+  CurrentUser option. Rotate any accidentally exposed key.
 - Treat imported documents and conversation exports as sensitive user files.
 - Configure only HTTPS API endpoints from providers you trust.
 - Review packaged dependency notices before redistributing a binary.

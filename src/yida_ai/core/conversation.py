@@ -26,6 +26,12 @@ class ConversationManager:
         self._turns.append(turn)
         return turn
 
+    def restore(self, turns: list[tuple[CaptionEvent, ReplySuggestion | None]]) -> None:
+        """Restore only the bounded set supplied by HistoryStore."""
+        for event, suggestion in turns[-self.context_turns :]:
+            turn = self.add_event(event)
+            turn.suggestion = suggestion
+
     def attach_suggestion(self, event_id: str, suggestion: ReplySuggestion) -> bool:
         for turn in self._turns:
             if turn.event.event_id == event_id:

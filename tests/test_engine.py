@@ -13,6 +13,7 @@ from yida_ai.core.models import EvidenceStatus, ReplySuggestion
 from yida_ai.providers.llm.base import LLMProvider
 from yida_ai.providers.llm.mock import MockLLMProvider
 from yida_ai.retrieval.keyword import KeywordRetriever
+from yida_ai.storage.history import HistoryStore
 
 
 class DelayedProvider(LLMProvider):
@@ -125,6 +126,31 @@ def test_reply_modes_and_confirm_mode(event_factory):
         controller.close()
 
 
+def test_translation_mode_persists_caption_without_ai(tmp_path, event_factory):
+    event = event_factory(text="A statement.", translated="一句陈述。")
+    history = HistoryStore(tmp_path / "history.db")
+    engine = ReplyEngine(
+        MockLLMProvider(),
+        KeywordRetriever(),
+        ConversationManager(15),
+        history,
+    )
+    controller = ApplicationController(
+        MockCaptionSource([event]),
+        CaptionAssembler(settle_seconds=0),
+        engine,
+        reply_mode="translation",
+    )
+    try:
+        update = controller.tick(now=1)
+        assert update.captions
+        loaded = history.load_recent()
+        assert loaded[0][1].event_id == event.event_id
+        assert loaded[0][2] is None
+    finally:
+        controller.close()
+
+
 def test_bounded_queue_discards_backlog_without_deadlock(event_factory):
     engine = _engine(DelayedProvider({"one": 0.15}), workers=1, max_queue=1)
     try:
@@ -139,7 +165,7 @@ def test_bounded_queue_discards_backlog_without_deadlock(event_factory):
 
 
 @pytest.mark.parametrize(
-    ("source_language", "reply_language"),
+    ("source_language", "translation_language"),
     [
         ("zh-CN", "en-US"),
         ("zh-CN", "pt-BR"),
@@ -149,27 +175,29 @@ def test_bounded_queue_discards_backlog_without_deadlock(event_factory):
         ("pt-BR", "en-US"),
     ],
 )
-def test_verified_language_pairs_complete_mock_flow(event_factory, source_language, reply_language):
-    event = event_factory(f"{source_language}-{reply_language}")
+def test_six_translation_directions_complete_mock_flow(
+    event_factory, source_language, translation_language
+):
+    event = event_factory(f"{source_language}-{translation_language}")
     event = type(event)(
         source_text=event.source_text,
         translated_text=event.translated_text,
         source_language=source_language,
-        translated_language="zh-CN",
+        translated_language=translation_language,
         event_id=event.event_id,
     )
     engine = ReplyEngine(
         MockLLMProvider(),
         KeywordRetriever(),
         ConversationManager(15),
-        user_language="zh-CN",
-        reply_language=reply_language,
+        user_language=translation_language,
+        reply_language=source_language,
     )
     try:
         engine.submit(event)
         result = _wait_results(engine, 1)[0].suggestion
         assert result is not None
         assert result.event_id == event.event_id
-        assert result.translated_reply.startswith(f"[{reply_language}]")
+        assert result.translated_reply.startswith(f"[{source_language}]")
     finally:
         engine.shutdown()

@@ -7,12 +7,24 @@ Yida AI v0.1.0-beta deliberately reuses the existing Windows caption and transla
 3. `LiveCaptionsTranslatorSource` opens `translation_history.db` in read-only
    mode and maps recognized schema aliases to `CaptionEvent`.
 
-The source searches user-independent common locations and the
-`LIVECAPTIONS_TRANSLATOR_DB` environment variable. A user can always select the
-database manually. It does not read the upstream API key/configuration and does
-not start, kill or control the upstream process.
+Database detection order is: a manually configured path, the
+`LIVECAPTIONS_TRANSLATOR_DB` environment variable, the database beside the
+currently running LCT executable, the bundled component directory, then common
+external LCT locations. This prevents a stale database in a generic location
+from hiding the active instance's output. Detection is repeated while the
+application runs, so a first-run database can appear without restarting Yida AI.
+Connections are read-only and explicitly closed.
 
-If no database exists, the GUI remains open with a configuration message. Use mock mode to test without the upstream application.
+`LctComponentManager` first reuses a compatible running external LCT. Otherwise
+it starts the verified executable from
+`components/LiveCaptionsTranslator/LiveCaptions Translator.exe` without
+`shell=True` and hides only the window of the process it started. The UI can
+show LCT settings on request. At shutdown, Yida AI never closes an external LCT;
+for an owned process it sends a normal window-close request and never force-kills
+an uncertain target. `--no-start-lct`, mock and headless modes do not start LCT.
+
+If LCT or its database is missing, the GUI remains open with recovery guidance.
+Yida AI never reads or modifies the upstream API key/configuration.
 
 Supported column aliases are deliberately contained in
 `src/yida_ai/adapters/captions/livecaptions_translator.py`. If an upstream release

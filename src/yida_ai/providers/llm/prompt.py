@@ -48,6 +48,13 @@ Grounding policy:
 Return one JSON object only with string fields:
 current_question, suggested_reply, translated_reply, evidence_status.
 evidence_status must be one of: documented, inferred, not_found.
+Example JSON output:
+{{
+  "current_question": "What was asked?",
+  "suggested_reply": "A concise reply.",
+  "translated_reply": "The translated reply.",
+  "evidence_status": "not_found"
+}}
 Expected evidence status from retrieval: {evidence_status.value}.
 """.strip()
     user = f"""

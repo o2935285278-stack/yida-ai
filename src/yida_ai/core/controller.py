@@ -73,9 +73,9 @@ class ApplicationController:
 
     def _record_or_generate(self, event: CaptionEvent) -> None:
         if self.reply_mode == "confirm":
-            self.engine.conversation.add_event(event)
+            self.engine.record_event(event)
             self.pending_confirmation[event.event_id] = event
         elif should_generate(self.reply_mode, event):
             self.engine.submit(event)
         else:
-            self.engine.conversation.add_event(event)
+            self.engine.record_event(event)

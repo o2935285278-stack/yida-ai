@@ -6,6 +6,9 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from yida_ai.config.languages import validate_language_code, validate_language_direction
+from yida_ai.security import SecretStore, SecretStoreError
+
 
 def default_data_dir() -> Path:
     configured = os.getenv("YIDA_AI_DATA_DIR")
@@ -24,6 +27,9 @@ class LLMSettings:
     max_tokens: int = 600
     temperature: float = 0.2
     retry_limit: int = 1
+    last_verified_at: str = ""
+    last_verified_provider: str = ""
+    last_verified_model: str = ""
 
     @property
     def api_key(self) -> str:
@@ -35,6 +41,8 @@ class CaptionSourceSettings:
     kind: str = "livecaptions-translator"
     database_path: str = ""
     poll_interval_ms: int = 180
+    auto_start_windows_captions: bool = True
+    show_system_caption_window: bool = True
 
 
 @dataclass(slots=True)
@@ -45,19 +53,25 @@ class PrivacySettings:
 
 @dataclass(slots=True)
 class AppSettings:
-    source_language: str = "pt-BR"
-    user_language: str = "zh-CN"
+    onboarding_completed: bool = False
+    speech_language: str = "pt-BR"
+    translation_language: str = "zh-CN"
     reply_language: str = "pt-BR"
     scene: str = "general"
     custom_scene_instruction: str = ""
     reply_mode: str = "every"
     reply_length: str = "short"
     context_turns: int = 15
+    interface_language: str = "zh-CN"
     llm: LLMSettings = field(default_factory=LLMSettings)
     caption_source: CaptionSourceSettings = field(default_factory=CaptionSourceSettings)
     privacy: PrivacySettings = field(default_factory=PrivacySettings)
 
     def validate(self) -> None:
+        validate_language_code(self.speech_language)
+        validate_language_code(self.translation_language)
+        validate_language_code(self.reply_language)
+        validate_language_direction(self.speech_language, self.translation_language)
         if not 1 <= self.context_turns <= 50:
             raise ValueError("最近对话轮数必须在 1 到 50 之间")
         if not 0 <= self.privacy.retention_days <= 3650:
@@ -66,18 +80,27 @@ class AppSettings:
             raise ValueError("未知回复模式")
         if self.reply_length not in {"short", "medium", "detailed"}:
             raise ValueError("未知回复长度")
+        if self.interface_language not in {"zh-CN", "en-US", "pt-BR"}:
+            raise ValueError("界面语言必须是 zh-CN、en-US 或 pt-BR")
 
 
 class SettingsStore:
-    def __init__(self, path: Path | None = None, data_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        path: Path | None = None,
+        data_dir: Path | None = None,
+        secret_store: SecretStore | None = None,
+    ) -> None:
         self.data_dir = data_dir or (path.parent if path else default_data_dir())
         self.path = path or self.data_dir / "config.json"
+        self.secret_store = secret_store or SecretStore(self.data_dir / "api-key.dpapi")
+        self.last_secret_error = ""
 
     def load(self) -> AppSettings:
         if not self.path.exists():
             return AppSettings()
         try:
-            raw = json.loads(self.path.read_text(encoding="utf-8"))
+            raw = json.loads(self.path.read_text(encoding="utf-8-sig"))
         except (OSError, json.JSONDecodeError) as exc:
             raise ValueError(f"配置文件无法读取：{exc}") from exc
         settings = _settings_from_dict(raw)
@@ -93,15 +116,49 @@ class SettingsStore:
             encoding="utf-8",
         )
 
+    def load_api_key(self) -> str:
+        environment_value = os.getenv("YIDA_AI_API_KEY", "").strip()
+        if environment_value:
+            self.last_secret_error = ""
+            return environment_value
+        try:
+            value = self.secret_store.load()
+        except SecretStoreError as exc:
+            self.last_secret_error = str(exc)
+            return ""
+        self.last_secret_error = ""
+        return value
+
+    def save_api_key(self, api_key: str) -> None:
+        self.secret_store.save(api_key)
+
+    def clear_api_key(self) -> None:
+        self.secret_store.clear()
+
+    def has_saved_api_key(self) -> bool:
+        return self.secret_store.exists
+
 
 def _settings_from_dict(raw: dict[str, Any]) -> AppSettings:
+    migrated = dict(raw)
+    if "onboarding_completed" not in migrated:
+        migrated["onboarding_completed"] = bool(migrated)
+    aliases = {
+        "source_language": "speech_language",
+        "user_language": "translation_language",
+        "ui_language": "interface_language",
+    }
+    for old_name, new_name in aliases.items():
+        if new_name not in migrated and old_name in migrated:
+            migrated[new_name] = migrated[old_name]
+        migrated.pop(old_name, None)
     values = {
         key: value
-        for key, value in raw.items()
+        for key, value in migrated.items()
         if key not in {"llm", "adapter", "caption_source", "privacy"}
     }
-    values["llm"] = LLMSettings(**raw.get("llm", {}))
-    source_values = raw.get("caption_source", raw.get("adapter", {}))
+    values["llm"] = LLMSettings(**migrated.get("llm", {}))
+    source_values = migrated.get("caption_source", migrated.get("adapter", {}))
     values["caption_source"] = CaptionSourceSettings(**source_values)
-    values["privacy"] = PrivacySettings(**raw.get("privacy", {}))
+    values["privacy"] = PrivacySettings(**migrated.get("privacy", {}))
     return AppSettings(**values)

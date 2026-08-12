@@ -8,6 +8,9 @@ class SceneTemplate:
     key: str
     name: str
     instruction: str
+    speech_language: str = ""
+    translation_language: str = ""
+    reply_language: str = ""
 
 
 SCENE_TEMPLATES: dict[str, SceneTemplate] = {
@@ -25,4 +28,36 @@ SCENE_TEMPLATES: dict[str, SceneTemplate] = {
         "language_learning", "语言学习", "兼顾正确性、自然表达和简短解释。"
     ),
     "custom": SceneTemplate("custom", "自定义模板", "遵循用户配置的场景规则。"),
+    "brazilian_customer": SceneTemplate(
+        "brazilian_customer",
+        "巴西客户",
+        "理解巴西葡语客户的问题，依据资料给出简短自然的巴西葡语回答，不编造承诺。",
+        "pt-BR",
+        "zh-CN",
+        "pt-BR",
+    ),
+    "english_customer": SceneTemplate(
+        "english_customer",
+        "英语客户",
+        "理解英语客户的问题，依据资料给出简短自然的美式英语回答，不编造承诺。",
+        "en-US",
+        "zh-CN",
+        "en-US",
+    ),
+    "chinese_speaker": SceneTemplate(
+        "chinese_speaker",
+        "中文发言",
+        "准确理解中文发言，提供便于跨语言沟通的回答，不推测资料中不存在的事实。",
+        "zh-CN",
+        "en-US",
+        "en-US",
+    ),
+    "chinese_to_brazilian": SceneTemplate(
+        "chinese_to_brazilian",
+        "中文发言（巴西葡语回复）",
+        "准确理解中文发言，给出简短自然的巴西葡语回答，不推测资料中不存在的事实。",
+        "zh-CN",
+        "pt-BR",
+        "pt-BR",
+    ),
 }

@@ -5,9 +5,32 @@
 - Project: LiveCaptions Translator
 - Author/copyright: Copyright 2024 SakiRinn and contributors
 - Repository: https://github.com/SakiRinn/LiveCaptions-Translator
-- License verified from local version `1.7.1300.1822` and the official repository: Apache License 2.0
+- Distributed version: `1.7.1300.1822`
+- Verified SHA-256: `62A5C9AC04FA48EC89A28168BB5835745DD332497CA1EF6184498E6565B4CB31`
+- License verified from that tag and the official repository: Apache License 2.0
 - Role: receives Windows Live Captions and provides the default caption/translation data source.
 
-Yida AI contains an independently written adapter that reads compatible caption history data in read-only mode. It does **not** bundle, modify, start, stop or claim ownership of LiveCaptions Translator. Therefore there are no modified upstream source files in this repository.
+The Windows installer redistributes the unmodified upstream executable under
+`components/LiveCaptionsTranslator`. Yida AI starts that separate process in the
+background when required, reuses an existing external process, and exposes an
+explicit button to show its settings. Yida AI contains independently written
+process-management and read-only database-adapter code. It does not modify or
+claim ownership of LCT, copy its source, read its API key/configuration, or imply
+that the upstream authors endorse Yida AI. There are no modified upstream files.
+
+The installer includes this notice, the Apache-2.0 license text, and a component
+manifest containing the redistributed binary version and hash.
+
+## Inno Setup Simplified Chinese language file
+
+- Source: https://github.com/jrsoftware/issrc/blob/main/Files/Languages/ChineseSimplified.isl
+- Maintainer identified in the upstream file: Zhenghan Yang (Kira)
+- Verified SHA-256: `BF0751FA176569C6FAA2F6E17ED2734617BEF325D5CC06EAE030FDD0258EE778`
+- Role: build-time Simplified Chinese messages for the Windows installer.
+- License: Inno Setup License; retained at `installer/languages/INNO_SETUP_LICENSE.txt`.
+
+The language file is kept unmodified and is consumed only while compiling the
+installer. It is not application runtime code and does not change the selected
+Yida AI interface language.
 
 Runtime/development Python packages and their own license texts remain governed by their respective distributions. Release builders should review the generated bundle before distribution.

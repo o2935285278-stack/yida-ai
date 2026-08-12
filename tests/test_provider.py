@@ -1,10 +1,12 @@
+import io
 import urllib.error
 
 import pytest
 
 from yida_ai.core.models import CaptionEvent, ReplyRequest
-from yida_ai.providers.llm.base import LLMConfigurationError, LLMError
+from yida_ai.providers.llm.base import LLMConfigurationError, LLMError, LLMErrorKind
 from yida_ai.providers.llm.openai_compatible import (
+    LLMEmptyResponseError,
     OpenAICompatibleConfig,
     OpenAICompatibleProvider,
 )
@@ -44,6 +46,49 @@ def test_provider_parses_mocked_response(monkeypatch):
         },
     )
     assert provider.generate(_request()).translated_reply == "Hello."
+
+
+def test_official_deepseek_disables_thinking(monkeypatch):
+    provider = _provider(
+        api_url="https://api.deepseek.com/v1/chat/completions",
+        model="deepseek-v4-flash",
+    )
+    captured = {}
+
+    def respond(payload):
+        captured.update(payload)
+        return {
+            "current_question": "你好？",
+            "suggested_reply": "您好。",
+            "translated_reply": "Hello.",
+            "evidence_status": "not_found",
+        }
+
+    monkeypatch.setattr(provider, "_post_json", respond)
+    provider.generate(_request())
+    assert captured["thinking"] == {"type": "disabled"}
+
+
+def test_empty_json_content_retries_without_response_format(monkeypatch):
+    provider = _provider(retry_limit=1)
+    payloads = []
+
+    def respond(payload):
+        payloads.append(dict(payload))
+        if len(payloads) == 1:
+            raise LLMEmptyResponseError("AI 服务返回了空内容")
+        return {
+            "current_question": "你好？",
+            "suggested_reply": "您好。",
+            "translated_reply": "Hello.",
+            "evidence_status": "not_found",
+        }
+
+    monkeypatch.setattr(provider, "_post_json", respond)
+    monkeypatch.setattr("yida_ai.providers.llm.openai_compatible.time.sleep", lambda _: None)
+    assert provider.generate(_request()).translated_reply == "Hello."
+    assert "response_format" in payloads[0]
+    assert "response_format" not in payloads[1]
 
 
 def test_provider_blocks_unsupported_document_claim(monkeypatch):
@@ -92,3 +137,50 @@ def test_timeout_and_offline_errors(monkeypatch, reason, message):
     monkeypatch.setattr("urllib.request.urlopen", fail)
     with pytest.raises(LLMError, match=message):
         provider.generate(_request())
+
+
+@pytest.mark.parametrize(
+    ("status", "kind", "message"),
+    [
+        (401, LLMErrorKind.INVALID_KEY, "API Key 无效"),
+        (404, LLMErrorKind.MODEL_NOT_FOUND, "模型不存在"),
+        (429, LLMErrorKind.RATE_LIMITED, "额度不足"),
+        (503, LLMErrorKind.SERVER_ERROR, "服务端"),
+    ],
+)
+def test_http_errors_are_classified_and_redacted(monkeypatch, status, kind, message):
+    secret = "fixture-sensitive-value"
+    provider = _provider(api_key=secret, retry_limit=0)
+    bodies = []
+
+    def fail(*args, **kwargs):
+        body = io.BytesIO(f'{{"error":"Bearer {secret}"}}'.encode())
+        bodies.append(body)
+        raise urllib.error.HTTPError(provider.config.api_url, status, "failure", {}, body)
+
+    monkeypatch.setattr("urllib.request.urlopen", fail)
+    with pytest.raises(LLMError, match=message) as captured:
+        provider.generate(_request())
+    assert captured.value.kind is kind
+    assert captured.value.status_code == status
+    assert secret not in str(captured.value)
+    assert bodies[0].closed
+
+
+def test_invalid_json_response_is_clear(monkeypatch):
+    provider = _provider(retry_limit=0)
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return b"not-json"
+
+    monkeypatch.setattr("urllib.request.urlopen", lambda *args, **kwargs: Response())
+    with pytest.raises(LLMError, match="无效 JSON") as captured:
+        provider.generate(_request())
+    assert captured.value.kind is LLMErrorKind.INVALID_RESPONSE
