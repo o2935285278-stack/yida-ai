@@ -34,3 +34,11 @@ installer. It is not application runtime code and does not change the selected
 Yida AI interface language.
 
 Runtime/development Python packages and their own license texts remain governed by their respective distributions. Release builders should review the generated bundle before distribution.
+
+## Packaged Python runtime and libraries
+
+The Windows application bundle includes the CPython runtime, PyInstaller
+bootloader and pypdf. Their license texts are installed under `licenses/` as
+`CPython-LICENSE.txt`, `PyInstaller-COPYING.txt` and `pypdf-LICENSE.txt`.
+Build-only packages and their reviewed license expressions are listed in
+`docs/DEPENDENCIES.md` and the release CycloneDX SBOM.

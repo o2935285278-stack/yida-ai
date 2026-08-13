@@ -50,7 +50,7 @@ def test_runtime_restores_only_configured_recent_history(
         AppSettings(
             context_turns=15,
             caption_source=CaptionSourceSettings(kind="mock"),
-            privacy=PrivacySettings(retention_days=0),
+            privacy=PrivacySettings(save_history=True, retention_days=0),
         )
     )
     history = HistoryStore(tmp_path / "history.db")

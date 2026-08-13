@@ -430,7 +430,7 @@ class YidaApp:
         self.api_url = StringVar()
         self.model = StringVar()
         self.api_key = StringVar()
-        self.persist_api_key = BooleanVar(value=True)
+        self.persist_api_key = BooleanVar(value=False)
         self.key_status = StringVar(value=self._t("no_saved_key"))
         self.save_history = BooleanVar(value=True)
         self.retention_days = IntVar(value=30)
@@ -550,6 +550,14 @@ class YidaApp:
             row=row, column=4, sticky="w", padx=5
         )
         row += 1
+        ttk.Label(
+            form,
+            text=self._t("settings_privacy_notice"),
+            foreground="#667085",
+            wraplength=760,
+            justify="left",
+        ).grid(row=row, column=0, columnspan=6, sticky="w", padx=5, pady=(2, 6))
+        row += 1
         ttk.Checkbutton(
             form,
             text=self._t("auto_start_captions"),
@@ -633,6 +641,7 @@ class YidaApp:
         self.ai_provider.set(settings.llm.provider)
         self.api_url.set(settings.llm.api_url)
         self.model.set(settings.llm.model)
+        self.persist_api_key.set(self.settings_store.has_saved_api_key())
         self.key_status.set(
             self._t("saved_unreadable")
             if self.settings_store.last_secret_error

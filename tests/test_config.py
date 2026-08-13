@@ -51,7 +51,9 @@ def test_settings_round_trip_does_not_persist_api_key(tmp_path, monkeypatch):
 
 def test_new_install_requires_onboarding_but_legacy_config_does_not(tmp_path):
     new_store = SettingsStore(tmp_path / "new.json", tmp_path / "new-data")
-    assert not new_store.load().onboarding_completed
+    new_settings = new_store.load()
+    assert not new_settings.onboarding_completed
+    assert not new_settings.privacy.save_history
 
     legacy_path = tmp_path / "legacy.json"
     legacy_path.write_text('{"speech_language":"en-US"}', encoding="utf-8")

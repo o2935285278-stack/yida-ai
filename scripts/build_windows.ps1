@@ -38,6 +38,34 @@ try {
     if (Test-Path -LiteralPath $SmokeData) {
         Remove-Item -LiteralPath $SmokeData -Recurse -Force
     }
+    $LicenseDirectory = Join-Path $RepoRoot "dist\YidaAI\licenses"
+    New-Item -ItemType Directory -Path $LicenseDirectory -Force | Out-Null
+    $PythonLicense = & $Python -c "import pathlib, sys; print(pathlib.Path(sys.base_prefix, 'LICENSE.txt').resolve())"
+    $PythonLicense = [IO.Path]::GetFullPath([string]$PythonLicense)
+    if ($LASTEXITCODE -ne 0 -or -not $PythonLicense) {
+        throw "Could not determine the Python license path for license packaging."
+    }
+    if (-not (Test-Path -LiteralPath $PythonLicense)) {
+        throw "Python license file was not found: $PythonLicense"
+    }
+    Copy-Item -LiteralPath $PythonLicense -Destination (Join-Path $LicenseDirectory "CPython-LICENSE.txt") -Force
+    $LicenseSources = @(
+        @{ Distribution = "pypdf-*.dist-info"; File = "licenses\LICENSE"; Output = "pypdf-LICENSE.txt" },
+        @{ Distribution = "PyInstaller-*.dist-info"; File = "licenses\COPYING.txt"; Output = "PyInstaller-COPYING.txt" }
+    )
+    $SitePackages = (Split-Path -Parent ([IO.Path]::GetFullPath($Python)))
+    $SitePackages = Join-Path (Split-Path -Parent $SitePackages) "Lib\site-packages"
+    if (-not (Test-Path -LiteralPath $SitePackages)) {
+        throw "Could not locate site-packages for license packaging: $SitePackages"
+    }
+    foreach ($License in $LicenseSources) {
+        $Distribution = Get-ChildItem -LiteralPath $SitePackages -Directory -Filter $License.Distribution |
+            Select-Object -First 1
+        if (-not $Distribution) { throw "Distribution metadata missing: $($License.Distribution)" }
+        $Source = Join-Path $Distribution.FullName $License.File
+        if (-not (Test-Path -LiteralPath $Source)) { throw "Dependency license missing: $Source" }
+        Copy-Item -LiteralPath $Source -Destination (Join-Path $LicenseDirectory $License.Output) -Force
+    }
     $Signed = $SigningMode -eq "Signed"
     $Verified = $false
     if ($Signed) {

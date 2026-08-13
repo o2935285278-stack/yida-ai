@@ -1,0 +1,10 @@
+# The project currently has one maintainer. This is truthful ownership, not
+# independent two-person approval.
+/.github/workflows/ @o2935285278-stack
+/installer/ @o2935285278-stack
+/scripts/build_installer.ps1 @o2935285278-stack
+/scripts/build_windows.ps1 @o2935285278-stack
+/scripts/signing.ps1 @o2935285278-stack
+/.signpath/ @o2935285278-stack
+/CODE_SIGNING_POLICY.md @o2935285278-stack
+

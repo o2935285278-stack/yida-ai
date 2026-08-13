@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import queue
 import threading
 from collections.abc import Callable
@@ -7,7 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
-from tkinter import StringVar, Tk, filedialog, messagebox, ttk
+from tkinter import BooleanVar, StringVar, Tk, filedialog, messagebox, ttk
 
 from yida_ai.adapters.captions import LiveCaptionsTranslatorSource
 from yida_ai.components import LctComponentManager
@@ -108,6 +109,8 @@ class OnboardingWizard:
         self.api_url = StringVar(value=self.flow.settings.llm.api_url)
         self.model = StringVar(value=self.flow.settings.llm.model)
         self.api_key = StringVar()
+        self.persist_api_key = BooleanVar(value=settings_store.has_saved_api_key())
+        self.save_history = BooleanVar(value=self.flow.settings.privacy.save_history)
         self.status_text = StringVar()
         self._ai_results: queue.Queue[tuple[bool, str]] = queue.Queue()
         self._preflight_results: queue.Queue[object] = queue.Queue()
@@ -438,8 +441,25 @@ class OnboardingWizard:
         ttk.Button(self.content, text=self._t("test_ai"), command=self._test_ai_connection).grid(
             row=len(fields), column=1, sticky="w", padx=8, pady=10
         )
+        ttk.Checkbutton(
+            self.content,
+            text=self._t("save_key"),
+            variable=self.persist_api_key,
+        ).grid(row=len(fields) + 1, column=1, sticky="w", padx=8, pady=3)
+        ttk.Checkbutton(
+            self.content,
+            text=self._t("save_history"),
+            variable=self.save_history,
+        ).grid(row=len(fields) + 2, column=1, sticky="w", padx=8, pady=3)
+        ttk.Label(
+            self.content,
+            text=self._t("wizard_ai_privacy_notice"),
+            foreground="#667085",
+            wraplength=620,
+            justify="left",
+        ).grid(row=len(fields) + 3, column=0, columnspan=2, sticky="w", padx=8, pady=8)
         ttk.Label(self.content, textvariable=self.status_text, foreground="#475467").grid(
-            row=len(fields) + 1, column=0, columnspan=2, sticky="w", padx=8
+            row=len(fields) + 4, column=0, columnspan=2, sticky="w", padx=8
         )
         self.skip_button.pack(side="right", padx=(8, 0))
 
@@ -536,9 +556,14 @@ class OnboardingWizard:
         settings.llm.provider = self.ai_provider.get().strip() or "mock"
         settings.llm.api_url = self.api_url.get().strip()
         settings.llm.model = self.model.get().strip()
+        settings.privacy.save_history = self.save_history.get()
         key = self.api_key.get().strip()
         if key:
+            os.environ["YIDA_AI_API_KEY"] = key
+        if self.persist_api_key.get() and key:
             self.settings_store.save_api_key(key)
+        elif not self.persist_api_key.get() and self.settings_store.has_saved_api_key():
+            self.settings_store.clear_api_key()
 
     def _advance(self) -> None:
         step = self.flow.step

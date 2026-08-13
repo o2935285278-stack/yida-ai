@@ -9,6 +9,8 @@ param(
     [string]$SignTool = "",
     [string]$CertificateThumbprint = "",
     [string]$TimestampUrl = "http://timestamp.digicert.com",
+    [switch]$SkipApplicationBuild,
+    [switch]$PrebuiltApplicationSignatureVerified,
     [switch]$FormalRelease
 )
 
@@ -24,6 +26,9 @@ $ResolvedLct = (Resolve-Path -LiteralPath $LctExecutable -ErrorAction Stop).Path
 
 if ($FormalRelease -and $SigningMode -ne "Signed") {
     throw "A formal Release requires Signed mode and successful SignTool verification."
+}
+if ($PrebuiltApplicationSignatureVerified -and -not $SkipApplicationBuild) {
+    throw "-PrebuiltApplicationSignatureVerified requires -SkipApplicationBuild."
 }
 
 if ([IO.Path]::GetFileName($ResolvedLct) -ne "LiveCaptions Translator.exe") {
@@ -54,15 +59,28 @@ if (-not $InnoCompiler -or -not (Test-Path -LiteralPath $InnoCompiler)) {
 
 Push-Location $RepoRoot
 try {
-    $BuildArguments = @{
-        Python = $Python
-        SigningMode = $SigningMode
-        SignTool = $SignTool
-        CertificateThumbprint = $CertificateThumbprint
-        TimestampUrl = $TimestampUrl
+    $Executable = Join-Path $RepoRoot "dist\YidaAI\YidaAI.exe"
+    if ($SkipApplicationBuild) {
+        if (-not (Test-Path -LiteralPath $Executable)) {
+            throw "Prebuilt YidaAI.exe was not found: $Executable"
+        }
+        if ($PrebuiltApplicationSignatureVerified) {
+            $PrebuiltSignature = Get-AuthenticodeSignature -LiteralPath $Executable
+            if ($PrebuiltSignature.Status -ne "Valid") {
+                throw "Prebuilt YidaAI.exe does not have a valid Authenticode signature."
+            }
+        }
+    } else {
+        $BuildArguments = @{
+            Python = $Python
+            SigningMode = $SigningMode
+            SignTool = $SignTool
+            CertificateThumbprint = $CertificateThumbprint
+            TimestampUrl = $TimestampUrl
+        }
+        & (Join-Path $PSScriptRoot "build_windows.ps1") @BuildArguments
+        if ($LASTEXITCODE -ne 0) { throw "Yida AI Windows build failed" }
     }
-    & (Join-Path $PSScriptRoot "build_windows.ps1") @BuildArguments
-    if ($LASTEXITCODE -ne 0) { throw "Yida AI Windows build failed" }
 
     $ForbiddenNames = @(
         "setting.json",
@@ -126,9 +144,12 @@ try {
     if ($FormalRelease -and -not $Verified) {
         throw "Signature verification failed; formal Release output is blocked."
     }
-    $Executable = Join-Path $RepoRoot "dist\YidaAI\YidaAI.exe"
+    $ExecutableSigned = ($SigningMode -eq "Signed") -or $PrebuiltApplicationSignatureVerified
     $Records = @(
-        Get-YidaSignatureRecord -Path $Executable -Signed $Signed -SignToolVerified $Verified
+        Get-YidaSignatureRecord `
+            -Path $Executable `
+            -Signed $ExecutableSigned `
+            -SignToolVerified ($Verified -or $PrebuiltApplicationSignatureVerified)
         Get-YidaSignatureRecord -Path $Installer -Signed $Signed -SignToolVerified $Verified
     )
     Write-YidaSignatureReport `

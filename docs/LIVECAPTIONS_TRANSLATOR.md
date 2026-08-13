@@ -1,6 +1,6 @@
 # LiveCaptions Translator integration
 
-Yida AI v0.1.0-beta deliberately reuses the existing Windows caption and translation path.
+Yida AI v0.2.2-beta deliberately reuses the existing Windows caption and translation path.
 
 1. Windows Live Captions recognizes system audio or microphone input using Windows capabilities.
 2. LiveCaptions Translator captures/translates captions and writes its caption history.
@@ -25,6 +25,12 @@ an uncertain target. `--no-start-lct`, mock and headless modes do not start LCT.
 
 If LCT or its database is missing, the GUI remains open with recovery guidance.
 Yida AI never reads or modifies the upstream API key/configuration.
+
+The redistributed x64-with-runtime asset comes from the official
+`v1.7.1300.1822` release. Its official GitHub asset digest, local build input and
+post-install copy must all equal
+`62A5C9AC04FA48EC89A28168BB5835745DD332497CA1EF6184498E6565B4CB31`.
+Yida AI never applies its current or future signing certificate to that file.
 
 Supported column aliases are deliberately contained in
 `src/yida_ai/adapters/captions/livecaptions_translator.py`. If an upstream release

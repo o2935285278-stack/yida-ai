@@ -1,0 +1,32 @@
+# Project-side review template. SignPath does not consume this file directly.
+status: placeholder-disabled
+repository: https://github.com/o2935285278-stack/yida-ai
+enabled_repository_variable: SIGNPATH_ENABLED
+trigger:
+  refs: ["refs/tags/v*"]
+  runner: github-hosted-windows
+team:
+  committer: ["o2935285278-stack"]
+  reviewer: ["o2935285278-stack"]
+  approver: ["o2935285278-stack"]
+  independent_review_claimed: false
+requests:
+  - name: application
+    signing_policy_variable: SIGNPATH_APP_POLICY_SLUG
+    artifact_configuration_variable: SIGNPATH_APP_ARTIFACT_CONFIG_SLUG
+    include: ["YidaAI.exe"]
+  - name: installer
+    signing_policy_variable: SIGNPATH_INSTALLER_POLICY_SLUG
+    artifact_configuration_variable: SIGNPATH_INSTALLER_ARTIFACT_CONFIG_SLUG
+    include: ["YidaAI-0.2.2-beta-win-x64-setup.exe"]
+exclude_from_signing:
+  - "LiveCaptions Translator.exe"
+  - "all other third-party binaries"
+required_verification:
+  - sha256-authenticode
+  - rfc3161-timestamp
+  - signtool-verify
+  - microsoft-defender-scan
+  - sbom
+  - final-sha256sums
+

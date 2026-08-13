@@ -1,0 +1,126 @@
+name: SignPath release signing (disabled until approved)
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  sign:
+    if: vars.SIGNPATH_ENABLED == 'true' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13.15"
+          cache: pip
+      - name: Install hash-locked build dependencies
+        run: python -m pip install --require-hashes -r requirements-build-win-py313.txt
+      - name: Audit source and dependencies
+        shell: powershell
+        run: |
+          scripts\check_sensitive.ps1
+          python scripts\check_dependency_licenses.py
+      - name: Fetch verified build inputs and build application
+        shell: powershell
+        run: |
+          scripts\fetch_lct.ps1
+          scripts\install_inno.ps1
+          scripts\build_windows.ps1 -Python python
+      - name: Scan unsigned application
+        shell: powershell
+        run: scripts\scan_release.ps1 -RequireAvailable -Path dist\YidaAI\YidaAI.exe
+      - name: Upload unsigned application before signing request
+        id: upload-unsigned-app
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: unsigned-yida-app-${{ github.run_id }}
+          path: dist/YidaAI/YidaAI.exe
+          if-no-files-found: error
+      - name: Submit YidaAI.exe signing request
+        uses: signpath/github-action-submit-signing-request@b9d91eadd323de506c0c81cf0c7fe7438f3360fd # v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_APP_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_APP_ARTIFACT_CONFIG_SLUG }}
+          github-artifact-id: ${{ steps.upload-unsigned-app.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: ${{ runner.temp }}/signpath-app
+      - name: Verify and stage signed application
+        shell: powershell
+        run: |
+          . scripts\signing.ps1
+          $signed = @(Get-ChildItem "${{ runner.temp }}\signpath-app" -Recurse -Filter YidaAI.exe)
+          if ($signed.Count -ne 1) { throw "Expected exactly one signed YidaAI.exe." }
+          $signTool = Resolve-YidaSignTool
+          & $signTool verify /pa /all /v $signed[0].FullName
+          if ($LASTEXITCODE -ne 0) { throw "Signed application verification failed." }
+          Copy-Item $signed[0].FullName dist\YidaAI\YidaAI.exe -Force
+      - name: Build installer around verified signed application
+        shell: powershell
+        run: |
+          $lct = "build\third-party\LiveCaptions Translator.exe"
+          $iscc = Join-Path $env:RUNNER_TEMP "inno-setup-6.7.3\ISCC.exe"
+          scripts\build_installer.ps1 -LctExecutable $lct -InnoCompiler $iscc -Python python -SkipApplicationBuild -PrebuiltApplicationSignatureVerified
+      - name: Upload unsigned installer before signing request
+        id: upload-unsigned-installer
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: unsigned-yida-installer-${{ github.run_id }}
+          path: dist/installer/YidaAI-0.2.2-beta-win-x64-setup.exe
+          if-no-files-found: error
+      - name: Submit installer signing request
+        uses: signpath/github-action-submit-signing-request@b9d91eadd323de506c0c81cf0c7fe7438f3360fd # v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_INSTALLER_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_INSTALLER_ARTIFACT_CONFIG_SLUG }}
+          github-artifact-id: ${{ steps.upload-unsigned-installer.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: ${{ runner.temp }}/signpath-installer
+      - name: Verify signed files and generate release metadata
+        shell: powershell
+        run: |
+          . scripts\signing.ps1
+          $signed = @(Get-ChildItem "${{ runner.temp }}\signpath-installer" -Recurse -Filter YidaAI-0.2.2-beta-win-x64-setup.exe)
+          if ($signed.Count -ne 1) { throw "Expected exactly one signed installer." }
+          Copy-Item $signed[0].FullName dist\installer\YidaAI-0.2.2-beta-win-x64-setup.exe -Force
+          $signTool = Resolve-YidaSignTool
+          $targets = @("dist\YidaAI\YidaAI.exe", "dist\installer\YidaAI-0.2.2-beta-win-x64-setup.exe")
+          foreach ($target in $targets) {
+            & $signTool verify /pa /all /v $target
+            if ($LASTEXITCODE -ne 0) { throw "SignTool verification failed: $target" }
+          }
+          $records = @($targets | ForEach-Object { Get-YidaSignatureRecord -Path $_ -Signed $true -SignToolVerified $true })
+          Write-YidaSignatureReport -Records $records -Destination dist\verification\signature.json
+          python scripts\generate_sbom.py --output dist\installer\YidaAI-0.2.2-beta.sbom.cdx.json
+          scripts\scan_release.ps1 -RequireAvailable -Path $targets
+          $releaseFiles = @(
+            "dist\installer\YidaAI-0.2.2-beta-win-x64-setup.exe",
+            "dist\installer\YidaAI-0.2.2-beta.sbom.cdx.json"
+          )
+          $lines = $releaseFiles | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_ -Algorithm SHA256).Hash.ToLowerInvariant(), (Split-Path $_ -Leaf) }
+          $lines | Set-Content dist\installer\SHA256SUMS.txt -Encoding ascii
+      - name: Upload signed release candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: yida-ai-signed-${{ github.sha }}
+          path: |
+            dist/installer/YidaAI-0.2.2-beta-win-x64-setup.exe
+            dist/installer/YidaAI-0.2.2-beta.sbom.cdx.json
+            dist/installer/SHA256SUMS.txt
+            dist/verification/signature.json
+          if-no-files-found: error
+          retention-days: 14
+

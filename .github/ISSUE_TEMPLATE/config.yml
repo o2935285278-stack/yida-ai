@@ -1,0 +1,6 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Private security report
+    url: https://github.com/o2935285278-stack/yida-ai/security/advisories/new
+    about: Do not put vulnerabilities, keys, captions, documents or personal data in a public issue.
+

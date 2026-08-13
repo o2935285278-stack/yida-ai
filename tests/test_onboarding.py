@@ -33,3 +33,10 @@ def test_three_interface_catalogs_have_identical_keys():
     expected = set(TRANSLATIONS["zh-CN"])
     assert set(TRANSLATIONS["en-US"]) == expected
     assert set(TRANSLATIONS["pt-BR"]) == expected
+
+
+@pytest.mark.parametrize("locale", ["zh-CN", "en-US", "pt-BR"])
+def test_onboarding_explains_external_ai_data_scope(locale):
+    notice = TRANSLATIONS[locale]["wizard_ai_privacy_notice"]
+    assert notice.strip()
+    assert len(notice) >= 80

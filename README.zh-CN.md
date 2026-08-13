@@ -4,7 +4,10 @@
 
 译答 AI 是“基于 Windows 实时字幕和翻译服务的多语言实时翻译与文档辅助回答工具”。它通过 [LiveCaptions Translator](https://github.com/SakiRinn/LiveCaptions-Translator) 接收 Windows 实时字幕及翻译，保留有限的最近对话，检索本地资料，并调用用户配置的 AI 生成有来源的建议回复。
 
-当前版本为 **v0.2.2-beta**。译答 AI 本身没有语音识别引擎，也不承诺完全准确或零延迟。当前公开构建为**未签名测试版**，不得显示为“已签名”。
+当前版本为 **v0.2.2-beta**。译答 AI 本身没有语音识别引擎，也不承诺完全准确或零延迟。当前待发布构建为**未签名测试版**，不得显示为“已签名”。
+
+官方仓库：<https://github.com/o2935285278-stack/yida-ai>。仓库公开后，只从其
+[Releases](https://github.com/o2935285278-stack/yida-ai/releases) 下载并核对 SHA-256；其他账号转载的二进制不是官方构建。
 
 ## 三部分各自负责什么
 
@@ -28,7 +31,7 @@ Apache-2.0 第三方后台组件一同安装；公开仓库不复制或修改上
 - OpenAI-compatible AI 接口（可配置 DeepSeek）和不收费的离线 Mock
 - TXT、Markdown 知识库；可复制文本的 PDF 为实验功能
 - 异步限长队列、结果顺序保护、清空会话后的旧结果丢弃
-- 可关闭历史保存、设置保留天数、清空、导出、删除资料
+- 本地历史为显式选择（新安装默认关闭），可设置保留天数、清空、导出、删除资料
 - 重启后恢复最近历史并重新用于 AI 上下文，默认最多 15 轮
 - 简体中文、英语和巴西葡语三套完整界面资源与独立的四类语言设置
 - 可选使用 Windows DPAPI CurrentUser 加密保存 AI API Key
@@ -97,7 +100,7 @@ AI 建议和文档引用会分开显示；资料证据不足时必须提示“�
 
 ## 数据与隐私
 
-默认私人数据目录是 `%LOCALAPPDATA%\YidaAI`，不在代码仓库内。也可使用 `--data-dir` 或 `YIDA_AI_DATA_DIR` 修改。启用外部 AI 后，当前字幕、最近上下文和检索到的资料片段会发送给所选提供商。完整说明见 [PRIVACY.md](PRIVACY.md)。
+默认私人数据目录是 `%LOCALAPPDATA%\YidaAI`，不在代码仓库内。也可使用 `--data-dir` 或 `YIDA_AI_DATA_DIR` 修改。启用外部 AI 后，当前字幕、最近上下文和检索到的资料片段会发送给所选提供商。新安装默认不保存对话历史；用户主动开启后才创建历史数据库。完整说明见 [PRIVACY.md](PRIVACY.md)。
 
 ## 验证和构建
 
@@ -109,7 +112,12 @@ powershell -ExecutionPolicy Bypass -File scripts\build_windows.ps1
 powershell -ExecutionPolicy Bypass -File scripts\build_installer.ps1 `
   -LctExecutable "C:\path\to\LiveCaptions Translator.exe"
 powershell -ExecutionPolicy Bypass -File scripts\check_sensitive.ps1
+python scripts\check_dependency_licenses.py
 ```
+
+发布工作流通过 `requirements-build-win-py313.txt` 与 `pip --require-hashes`
+锁定构建依赖，校验官方 LCT 和 Inno Setup 下载，生成 CycloneDX SBOM 与
+SHA-256 清单，并执行 Defender 扫描。参见[仓库安全建议](docs/REPOSITORY_SECURITY.md)。
 
 以上为默认无证书构建，并会明确输出“当前安装包未进行可信代码签名。”。已有可信证书时，从 Windows 证书存储按指纹签名：
 
@@ -124,6 +132,17 @@ powershell -ExecutionPolicy Bypass -File scripts\build_installer.ps1 `
 流水线按顺序签署并验证 `YidaAI.exe`、构建安装包、签署并验证安装包，使用 SHA-256 与 RFC 3161 时间戳，最后才计算安装包 SHA-256。正式 Release 验证失败会停止。PFX、私钥、密码、令牌或云签名凭据不得写入源码、日志或安装包；CI 只能使用 Secrets 或可信云签名服务。上游 LCT 始终保持原文件和原签名，不使用译答 AI 证书重新签署。
 
 架构见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，发布结果见 [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)。
+
+公开项目与使用文档：
+
+- [隐私政策](PRIVACY.md)与[安全报告](SECURITY.md)
+- [代码签名政策](CODE_SIGNING_POLICY.md)
+- [故障排查](docs/TROUBLESHOOTING.md)
+- [Windows 语言支持](docs/WINDOWS_LANGUAGE_SUPPORT.md)
+- [贡献说明](CONTRIBUTING.md)与[行为准则](CODE_OF_CONDUCT.md)
+
+当前候选包仍未签名。仓库中的 SignPath 工作流是未获批准前保持禁用的占位配置，
+不代表项目已经获得证书，也不代表已有签名发行版。
 
 ## 已知限制
 
@@ -149,7 +168,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build_installer.ps1 `
 - 没有翻译：打开翻译器设置，检查 LCT 目标语言和翻译服务；译答 AI 不读取 LCT Key。
 - AI 提示缺 Key、401、404、429：分别检查保存状态、密钥权限、模型/端点和额度。
 - 网络超时或服务端错误：字幕仍会继续；检查网络/服务状态后重试。
-- 历史未恢复：确认此前已开启“保存历史”，并检查保留期限。
+- 历史未恢复：新安装默认关闭历史；确认此前已主动开启“保存历史”，并检查保留期限。
 
 ## 卸载
 

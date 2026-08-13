@@ -42,7 +42,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "clear_key": "删 Key",
         "test_ai": "测试 AI 连接",
         "save_reload": "保存",
-        "save_history": "保存历史",
+        "save_history": "在本机保存字幕、翻译和回复历史（默认关闭）",
+        "settings_privacy_notice": "外部 AI 会收到当前字幕、所选最近上下文、场景规则和相关资料片段；关闭 AI 或使用 Mock 时不会发送。LCT 的翻译传输由其单独设置。",
         "retention": "保留天数（0=不自动清理）",
         "auto_start_captions": "自动启动实时字幕",
         "show_captions": "显示系统字幕窗口（推荐）",
@@ -147,7 +148,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "wizard_lct_title": "配置并测试翻译链路",
         "wizard_lct_desc": "打开 LCT 设置翻译服务和目标语言，保存后收回后台，再说一句话测试。",
         "wizard_ai_title": "配置并测试 AI",
-        "wizard_ai_desc": "Key 使用 Windows DPAPI 保存，不会写入普通配置或日志。",
+        "wizard_ai_desc": "选择 Mock 可保持离线；配置外部 AI 前请确认下面的数据与保存选项。",
+        "wizard_ai_privacy_notice": (
+            "使用外部 AI 时，当前字幕、最多所选轮数的最近上下文、场景规则和检索到的资料片段会发送给该服务商。"
+            "不勾选保存 Key 时，Key 只在当前进程使用；历史记录默认关闭。翻译服务仍由 LCT 单独配置。"
+        ),
         "wizard_knowledge_title": "导入资料（可跳过）",
         "wizard_knowledge_desc": "导入 TXT、Markdown 或可提取文字的 PDF，让建议回答依据你的资料。",
         "wizard_complete_title": "设置完成",
@@ -261,7 +266,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "clear_key": "Key",
         "test_ai": "Test AI connection",
         "save_reload": "Save",
-        "save_history": "Save history",
+        "save_history": "Save captions, translations and replies locally (off by default)",
+        "settings_privacy_notice": "External AI receives the current caption, selected recent context, scene rules, and relevant document excerpts. Disable AI or use Mock to avoid this transfer. LCT handles translation separately.",
         "retention": "Retention days (0=never prune)",
         "auto_start_captions": "Start Windows Live Captions automatically",
         "show_captions": "Show system caption window (recommended)",
@@ -369,7 +375,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "wizard_lct_title": "Configure and test translation",
         "wizard_lct_desc": "Open LCT settings, choose a service and target language, save, return it to the background, then speak once.",
         "wizard_ai_title": "Configure and test AI",
-        "wizard_ai_desc": "The Key is protected with Windows DPAPI and is never written to ordinary settings or logs.",
+        "wizard_ai_desc": "Mock stays offline. Review the data-sharing and storage choices below before configuring external AI.",
+        "wizard_ai_privacy_notice": (
+            "External AI receives the current caption, up to the selected number of recent turns, scene rules, and retrieved document excerpts. "
+            "If key storage is unchecked, the key is process-only; local history is off by default. LCT configures translation separately."
+        ),
         "wizard_knowledge_title": "Import documents (optional)",
         "wizard_knowledge_desc": "Import TXT, Markdown, or extractable-text PDF files to ground suggested replies.",
         "wizard_complete_title": "Setup complete",
@@ -482,7 +492,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "clear_key": "Chave",
         "test_ai": "Testar conexão com a IA",
         "save_reload": "Salvar",
-        "save_history": "Salvar histórico",
+        "save_history": "Salvar legendas, traduções e respostas localmente (desativado por padrão)",
+        "settings_privacy_notice": "A IA externa recebe a legenda atual, o contexto recente escolhido, regras do cenário e trechos relevantes dos documentos. Desative a IA ou use o modo simulado para não enviar. O LCT trata a tradução separadamente.",
         "retention": "Dias de retenção (0=não excluir)",
         "auto_start_captions": "Iniciar Legendas ao Vivo",
         "show_captions": "Mostrar janela das legendas do sistema (recomendado)",
@@ -590,7 +601,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "wizard_lct_title": "Configurar e testar a tradução",
         "wizard_lct_desc": "Abra o LCT, escolha o serviço e o idioma de destino, salve, recolha-o e fale uma frase.",
         "wizard_ai_title": "Configurar e testar a IA",
-        "wizard_ai_desc": "A chave é protegida pelo DPAPI do Windows e não entra nas configurações comuns ou logs.",
+        "wizard_ai_desc": "O modo simulado fica offline. Revise abaixo o envio e o armazenamento de dados antes de configurar uma IA externa.",
+        "wizard_ai_privacy_notice": (
+            "A IA externa recebe a legenda atual, até o número escolhido de turnos recentes, regras do cenário e trechos recuperados dos documentos. "
+            "Sem salvar a chave, ela vale só para o processo atual; o histórico local vem desativado. A tradução é configurada separadamente no LCT."
+        ),
         "wizard_knowledge_title": "Importar documentos (opcional)",
         "wizard_knowledge_desc": "Importe TXT, Markdown ou PDF com texto extraível para fundamentar as respostas.",
         "wizard_complete_title": "Configuração concluída",

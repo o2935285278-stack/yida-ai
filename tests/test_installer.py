@@ -44,6 +44,13 @@ def test_packaged_executable_uses_version_resource():
     assert __version__ == "0.2.2-beta"
 
 
+def test_windows_bundle_packages_runtime_license_texts():
+    content = (ROOT / "scripts" / "build_windows.ps1").read_text(encoding="utf-8")
+    assert "CPython-LICENSE.txt" in content
+    assert "PyInstaller-COPYING.txt" in content
+    assert "pypdf-LICENSE.txt" in content
+
+
 def test_build_pipeline_reserves_secure_unsigned_and_signed_modes():
     windows_build = (ROOT / "scripts" / "build_windows.ps1").read_text(encoding="utf-8")
     installer_build = (ROOT / "scripts" / "build_installer.ps1").read_text(

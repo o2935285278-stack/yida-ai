@@ -47,7 +47,7 @@ class CaptionSourceSettings:
 
 @dataclass(slots=True)
 class PrivacySettings:
-    save_history: bool = True
+    save_history: bool = False
     retention_days: int = 30
 
 

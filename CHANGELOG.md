@@ -2,6 +2,19 @@
 
 All notable changes follow Keep a Changelog conventions.
 
+## [Unreleased]
+
+### Added
+
+- Public-project governance, troubleshooting, Windows-language and code-signing policies.
+- Full-history sanitized secret scanning and disabled SignPath/supply-chain CI templates.
+
+### Changed
+
+- New installations keep local conversation history off until the user opts in.
+- First-run and settings screens now explain external AI data scope and make
+  API-key persistence and history storage explicit choices.
+
 ## [0.2.2-beta] - 2026-08-10
 
 ### Added
