@@ -12,8 +12,8 @@ This is a **v0.2.2-beta** project. It is not a speech-recognition engine and doe
 not promise perfect translation or zero latency. The current release candidate
 is **unsigned** and must not be represented as signed.
 
-Official repository: <https://github.com/o2935285278-stack/yida-ai>. Once the
-repository is public, use only its [Releases](https://github.com/o2935285278-stack/yida-ai/releases)
+Official repository: <https://github.com/o2935285278-stack/yida-ai>. Use only
+its [Releases](https://github.com/o2935285278-stack/yida-ai/releases)
 and verify the published SHA-256. Reposted binaries are not official builds.
 
 [简体中文说明](README.zh-CN.md)
@@ -167,11 +167,12 @@ Public-project policies and operational help:
 
 - [Privacy](PRIVACY.md) and [security reporting](SECURITY.md)
 - [Code signing policy](CODE_SIGNING_POLICY.md)
+- [SignPath Foundation application draft](docs/SIGNPATH_FOUNDATION_APPLICATION.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Windows language support](docs/WINDOWS_LANGUAGE_SUPPORT.md)
 - [Contributing](CONTRIBUTING.md) and [code of conduct](CODE_OF_CONDUCT.md)
 
-The current candidate is unsigned. SignPath workflow files are disabled
+The public `v0.2.2-beta` release is unsigned. SignPath workflow files are disabled
 placeholders until Foundation approval; they are not evidence of a valid
 certificate or signed release.
 

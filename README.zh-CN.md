@@ -137,11 +137,12 @@ powershell -ExecutionPolicy Bypass -File scripts\build_installer.ps1 `
 
 - [隐私政策](PRIVACY.md)与[安全报告](SECURITY.md)
 - [代码签名政策](CODE_SIGNING_POLICY.md)
+- [SignPath Foundation 申请草稿](docs/SIGNPATH_FOUNDATION_APPLICATION.md)
 - [故障排查](docs/TROUBLESHOOTING.md)
 - [Windows 语言支持](docs/WINDOWS_LANGUAGE_SUPPORT.md)
 - [贡献说明](CONTRIBUTING.md)与[行为准则](CODE_OF_CONDUCT.md)
 
-当前候选包仍未签名。仓库中的 SignPath 工作流是未获批准前保持禁用的占位配置，
+公开的 `v0.2.2-beta` 仍未签名。仓库中的 SignPath 工作流是未获批准前保持禁用的占位配置，
 不代表项目已经获得证书，也不代表已有签名发行版。
 
 ## 已知限制
