@@ -1,5 +1,8 @@
 import gc
+import os
 import time
+
+import pytest
 
 from yida_ai.__main__ import build_parser, main
 from yida_ai.components import LctComponentState, LctComponentStatus
@@ -80,6 +83,10 @@ def test_no_start_lct_argument_is_available():
     assert build_parser().parse_args(["--no-start-lct"]).no_start_lct
 
 
+@pytest.mark.skipif(
+    os.environ.get("GITHUB_ACTIONS") == "true",
+    reason="GitHub-hosted Windows runners do not provide an interactive Tk desktop",
+)
 def test_gui_window_starts_and_closes_cleanly(tmp_path, monkeypatch):
     from tkinter import messagebox
 
@@ -153,6 +160,10 @@ def test_gui_window_starts_and_closes_cleanly(tmp_path, monkeypatch):
     assert manager.closed
 
 
+@pytest.mark.skipif(
+    os.environ.get("GITHUB_ACTIONS") == "true",
+    reason="GitHub-hosted Windows runners do not provide an interactive Tk desktop",
+)
 def test_main_controls_fit_at_125_and_150_percent_tk_scaling(tmp_path, monkeypatch):
     from tkinter import messagebox
 
