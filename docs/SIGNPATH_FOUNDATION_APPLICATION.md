@@ -1,8 +1,10 @@
-# SignPath Foundation application draft
+# SignPath Foundation application record
 
-Status: prepared but **not submitted**. The maintainer must personally review
-the current SignPath Foundation terms, provide private contact details, confirm
-MFA, and submit the application.
+Status: **submitted by the maintainer on 2026-08-13; awaiting review**. This is
+not evidence of approval, an issued certificate, or a signed release. The
+maintainer personally provided private contact details, confirmed the current
+terms, and submitted the application; those private values are not recorded in
+this repository.
 
 ## Project identity
 
@@ -151,15 +153,23 @@ tokens may only be stored in GitHub Secrets. See
 [CODE_SIGNING_POLICY.md](../CODE_SIGNING_POLICY.md) and
 [the disabled workflow](../.github/workflows/signpath-release.yml).
 
-## Maintainer checklist before submission
+## Submission record and next steps
 
-- [ ] Read and personally accept the current SignPath Foundation terms.
-- [ ] Confirm GitHub MFA is enabled; save recovery codes privately.
-- [ ] Add a passkey or another recovery method where practical.
-- [ ] Enter private applicant contact details directly in the application form.
-- [ ] Recheck all repository, release, privacy, license, and signing-scope links.
-- [ ] Confirm that the early project history and limited reputation are stated
+- [x] The maintainer personally reviewed and accepted the current SignPath
+      Foundation terms.
+- [x] GitHub MFA was confirmed enabled; recovery information remains private.
+- [x] Private applicant contact details were entered directly into the
+      application form and were not committed.
+- [x] Repository, release, privacy, license, and signing-scope links were
+      rechecked before submission.
+- [x] The early project history and limited reputation were stated
       honestly.
-- [ ] Confirm no LCT or other upstream binary will receive the Yida AI signature.
-- [ ] Submit the application personally.
-
+- [x] The application excludes LCT and other upstream binaries from the Yida AI
+      signature scope.
+- [x] The maintainer personally submitted the application on 2026-08-13.
+- [ ] Wait for a real SignPath Foundation decision without repeatedly
+      resubmitting.
+- [ ] If approved, enter only the actual SignPath identifiers as GitHub
+      Variables/Secrets, enable the signing workflow, and publish the first
+      signed build under a new `v0.2.3-beta` tag.
+- [ ] Add a passkey or another GitHub recovery method where practical.

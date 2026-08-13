@@ -137,7 +137,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build_installer.ps1 `
 
 - [隐私政策](PRIVACY.md)与[安全报告](SECURITY.md)
 - [代码签名政策](CODE_SIGNING_POLICY.md)
-- [SignPath Foundation 申请草稿](docs/SIGNPATH_FOUNDATION_APPLICATION.md)
+- [SignPath Foundation 申请记录](docs/SIGNPATH_FOUNDATION_APPLICATION.md)
 - [故障排查](docs/TROUBLESHOOTING.md)
 - [Windows 语言支持](docs/WINDOWS_LANGUAGE_SUPPORT.md)
 - [贡献说明](CONTRIBUTING.md)与[行为准则](CODE_OF_CONDUCT.md)

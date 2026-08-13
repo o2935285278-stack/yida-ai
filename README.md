@@ -167,7 +167,7 @@ Public-project policies and operational help:
 
 - [Privacy](PRIVACY.md) and [security reporting](SECURITY.md)
 - [Code signing policy](CODE_SIGNING_POLICY.md)
-- [SignPath Foundation application draft](docs/SIGNPATH_FOUNDATION_APPLICATION.md)
+- [SignPath Foundation application record](docs/SIGNPATH_FOUNDATION_APPLICATION.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Windows language support](docs/WINDOWS_LANGUAGE_SUPPORT.md)
 - [Contributing](CONTRIBUTING.md) and [code of conduct](CODE_OF_CONDUCT.md)
