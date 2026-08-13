@@ -29,6 +29,21 @@ try {
 }
 finally {
     if (Test-Path -LiteralPath $Download) {
-        Remove-Item -LiteralPath $Download -Force
+        $Removed = $false
+        foreach ($Attempt in 1..10) {
+            try {
+                Remove-Item -LiteralPath $Download -Force -ErrorAction Stop
+                $Removed = $true
+                break
+            }
+            catch {
+                if ($Attempt -lt 10) {
+                    Start-Sleep -Milliseconds 500
+                }
+            }
+        }
+        if (-not $Removed) {
+            Write-Warning "Could not remove the verified temporary Inno Setup download; the runner temporary directory will clean it up."
+        }
     }
 }
