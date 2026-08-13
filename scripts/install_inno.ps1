@@ -19,8 +19,21 @@ try {
     if ($Hash -ne $ExpectedSha256) {
         throw "Unexpected Inno Setup SHA-256: $Hash"
     }
-    & $Download /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- "/DIR=$InstallDirectory"
-    if ($LASTEXITCODE -ne 0) { throw "Inno Setup installation failed: $LASTEXITCODE" }
+    $InstallerArguments = @(
+        "/VERYSILENT",
+        "/SUPPRESSMSGBOXES",
+        "/NORESTART",
+        "/SP-",
+        "/DIR=$InstallDirectory"
+    )
+    $InstallerProcess = Start-Process -FilePath $Download `
+        -ArgumentList $InstallerArguments `
+        -Wait `
+        -PassThru `
+        -WindowStyle Hidden
+    if ($InstallerProcess.ExitCode -ne 0) {
+        throw "Inno Setup installation failed: $($InstallerProcess.ExitCode)"
+    }
     $Compiler = Join-Path $InstallDirectory "ISCC.exe"
     if (-not (Test-Path -LiteralPath $Compiler)) {
         throw "Inno Setup compiler was not installed: $Compiler"
