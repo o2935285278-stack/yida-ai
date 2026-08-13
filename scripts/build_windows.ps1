@@ -53,8 +53,11 @@ try {
         @{ Distribution = "pypdf-*.dist-info"; File = "licenses\LICENSE"; Output = "pypdf-LICENSE.txt" },
         @{ Distribution = "PyInstaller-*.dist-info"; File = "licenses\COPYING.txt"; Output = "PyInstaller-COPYING.txt" }
     )
-    $SitePackages = (Split-Path -Parent ([IO.Path]::GetFullPath($Python)))
-    $SitePackages = Join-Path (Split-Path -Parent $SitePackages) "Lib\site-packages"
+    $SitePackages = & $Python -c "import sysconfig; print(sysconfig.get_path('purelib'))"
+    $SitePackages = [IO.Path]::GetFullPath([string]$SitePackages)
+    if ($LASTEXITCODE -ne 0 -or -not $SitePackages) {
+        throw "Could not determine site-packages for license packaging."
+    }
     if (-not (Test-Path -LiteralPath $SitePackages)) {
         throw "Could not locate site-packages for license packaging: $SitePackages"
     }
