@@ -45,7 +45,7 @@ jobs:
           path: dist/YidaAI/YidaAI.exe
           if-no-files-found: error
       - name: Submit YidaAI.exe signing request
-        uses: signpath/github-action-submit-signing-request@b9d91eadd323de506c0c81cf0c7fe7438f3360fd # v2
+        uses: signpath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
@@ -79,7 +79,7 @@ jobs:
           path: dist/installer/YidaAI-0.2.2-beta-win-x64-setup.exe
           if-no-files-found: error
       - name: Submit installer signing request
-        uses: signpath/github-action-submit-signing-request@b9d91eadd323de506c0c81cf0c7fe7438f3360fd # v2
+        uses: signpath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
