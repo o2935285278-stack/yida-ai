@@ -1,5 +1,9 @@
 # Reproducible Windows x64 release-build environment for CPython 3.13.
 # Regenerate only after dependency, license and clean-build review.
+comtypes==1.4.16 \
+    --hash=sha256:e18d85179ff12955524c5a8c3bc09cb3c0d890f1da4d7123d14244c7b78f84c8
+tkinterdnd2==0.6.3 \
+    --hash=sha256:50c7386302104bfb30d8e15b4cc53c0581bc51a28186ff4d7ad3cb2cc820c936
 altgraph==0.17.5 \
     --hash=sha256:f3a22400bce1b0c701683820ac4f3b159cd301acab067c51c653e06961600597
 packaging==26.3 \
@@ -16,4 +20,3 @@ pywin32-ctypes==0.2.3 \
     --hash=sha256:8a1513379d709975552d202d942d9837758905c8d01eb82b8bcc30918929e7b8
 setuptools==84.0.0 \
     --hash=sha256:51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670
-

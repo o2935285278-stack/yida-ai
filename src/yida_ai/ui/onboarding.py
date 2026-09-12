@@ -345,6 +345,12 @@ class OnboardingWizard:
         self.status_text.set(self.windows_manager.retry_start().detail)
 
     def _render_lct(self) -> None:
+        if self.flow.settings.caption_source.kind == "windows-captions":
+            self.title.set(self._t("native_source"))
+            self.description.set(self._t("native_source"))
+            self.status_text.set(self._t("native_source"))
+            self._status_label()
+            return
         if self.lct_manager is None:
             self.lct_manager = LctComponentManager(no_start=self.no_start_lct)
             self.lct_manager.ensure_running()

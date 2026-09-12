@@ -754,6 +754,53 @@ REPLY_LENGTH_NAMES: dict[str, dict[str, str]] = {
 }
 
 
+TRANSLATIONS["zh-CN"].update({
+    "message_details": "详情",
+    "quiet_start_note": "取消显示：试验性自动隐藏（仅限译答启动的字幕）；读取失败会恢复窗口。",
+    "convert_reply": "转换此回答语言",
+    "translation_pending": "等待翻译…",
+    "translation_failed": "翻译失败：{detail}",
+    "native_source": "直接读取 Windows 字幕",
+    "drop_hint": "拖入 TXT / Markdown / PDF 资料",
+    "import_progress": "正在导入资料…",
+    "import_done": "已导入 {count} 份；失败 {errors} 份",
+    "switching": "正在切换 Windows 听取语言…",
+    "switch_manual": "请在 Windows 字幕设置中选择 {language} 后重试",
+    "switch_done": "听取语言已切换：{language}",
+    "saved_key": "已安全保存 API Key；留空会保留原 Key"
+})
+TRANSLATIONS["en-US"].update({
+    "message_details": "Details",
+    "quiet_start_note": "Uncheck to try auto-hide for captions started by Yida; read failure restores the window.",
+    "convert_reply": "Convert reply language",
+    "translation_pending": "Waiting for translation…",
+    "translation_failed": "Translation failed: {detail}",
+    "native_source": "Direct Windows captions",
+    "drop_hint": "Drop TXT / Markdown / PDF files here",
+    "import_progress": "Importing documents…",
+    "import_done": "Imported {count}; failed {errors}",
+    "switching": "Switching Windows caption language…",
+    "switch_manual": "Select {language} in Windows caption settings and retry",
+    "switch_done": "Listening language switched: {language}",
+    "saved_key": "API key saved securely; leave blank to keep it"
+})
+TRANSLATIONS["pt-BR"].update({
+    "message_details": "Detalhes",
+    "quiet_start_note": "Desmarque para testar a ocultação das legendas iniciadas pelo Yida; falhas restauram a janela.",
+    "convert_reply": "Converter idioma da resposta",
+    "translation_pending": "Aguardando tradução…",
+    "translation_failed": "Falha na tradução: {detail}",
+    "native_source": "Legendas diretas do Windows",
+    "drop_hint": "Arraste TXT / Markdown / PDF aqui",
+    "import_progress": "Importando documentos…",
+    "import_done": "Importados: {count}; falhas: {errors}",
+    "switching": "Alterando idioma das legendas…",
+    "switch_manual": "Selecione {language} nas legendas do Windows e tente novamente",
+    "switch_done": "Idioma de escuta alterado: {language}",
+    "saved_key": "Chave salva com segurança; deixe em branco para mantê-la"
+})
+
+
 def tr(locale: str, key: str, **values: object) -> str:
     catalog = TRANSLATIONS.get(locale, TRANSLATIONS["zh-CN"])
     template = catalog.get(key, TRANSLATIONS["zh-CN"].get(key, key))

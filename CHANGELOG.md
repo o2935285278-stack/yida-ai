@@ -4,6 +4,29 @@ All notable changes follow Keep a Changelog conventions.
 
 ## [Unreleased]
 
+### 0.2.4-beta UI preview
+
+- Simplified the conversation page and moved diagnostics/tools into Settings.
+- Adopted native Windows ttk styling and quieter conversation cards.
+- Collapsed message details and preserved history scroll position on new messages.
+- Added opt-in owned-window auto-hide with readability checks and restoration.
+- Hidden-window live recognition and the microphone quick toggle remain release gates;
+  see docs/VERIFICATION-0.2.4-preview.md. This is not a completed formal release.
+
+### 0.2.3-beta development preview
+
+- Added in-process WindowsCaptionSource using Windows Live Captions UI Automation;
+  retained the LCT adapter as an optional compatibility source.
+- Added asynchronous native translation and late LCT translation updates on the
+  existing conversation card without a duplicate reply request.
+- Added independent reply-language selection and existing-reply translation.
+- Added batch drag/drop TXT, MD and text-PDF import with collision-safe filenames.
+- Added background Windows caption-language switching and manual fallback hints.
+- Clarified saved-key status and fixed stale startup managers after source changes.
+- Fixed UTF-8 license-path discovery when building under Chinese directory names.
+- This preview is unsigned; Windows-build compatibility and live API latency need
+  further real-world testing before public release.
+
 ### Added
 
 - Public-project governance, troubleshooting, Windows-language and code-signing policies.

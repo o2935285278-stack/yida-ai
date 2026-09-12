@@ -23,7 +23,7 @@ def test_inno_installer_is_per_user_and_has_only_yida_product_shortcuts():
 
 def test_installer_has_three_languages_and_version_metadata():
     content = (ROOT / "installer" / "YidaAI.iss").read_text(encoding="utf-8")
-    assert '#define AppVersion "0.2.2-beta"' in content
+    assert f'#define AppVersion "{__version__}"' in content
     assert "VersionInfoVersion={#AppNumericVersion}" in content
     assert 'Name: "english"; MessagesFile: "compiler:Default.isl"' in content
     assert 'Name: "chinesesimplified"' in content
@@ -39,9 +39,9 @@ def test_packaged_executable_uses_version_resource():
     content = (ROOT / "scripts" / "build_windows.ps1").read_text(encoding="utf-8")
     version_resource = (ROOT / "installer" / "version_info.txt").read_text(encoding="utf-8")
     assert "--version-file installer/version_info.txt" in content
-    assert "filevers=(0, 2, 2, 0)" in version_resource
-    assert "ProductVersion', '0.2.2-beta'" in version_resource
-    assert __version__ == "0.2.2-beta"
+    numeric = tuple(int(part) for part in __version__.split("-")[0].split(".")) + (0,)
+    assert f"filevers={numeric}" in version_resource
+    assert f"ProductVersion', '{__version__}'" in version_resource
 
 
 def test_windows_bundle_packages_runtime_license_texts():

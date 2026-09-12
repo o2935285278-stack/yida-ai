@@ -8,8 +8,8 @@
   #error LctManifest must be provided by scripts/build_installer.ps1
 #endif
 
-#define AppVersion "0.2.2-beta"
-#define AppNumericVersion "0.2.2.0"
+#define AppVersion "0.2.4-beta"
+#define AppNumericVersion "0.2.4.0"
 
 [Setup]
 #ifdef QaBuild
@@ -34,9 +34,9 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir={#SourceRoot}\dist\installer
 #ifdef QaBuild
-OutputBaseFilename=YidaAI-0.2.2-beta-win-x64-qa-setup
+OutputBaseFilename=YidaAI-0.2.4-beta-win-x64-qa-setup
 #else
-OutputBaseFilename=YidaAI-0.2.2-beta-win-x64-setup
+OutputBaseFilename=YidaAI-0.2.4-beta-win-x64-setup
 #endif
 Compression=lzma2
 SolidCompression=yes

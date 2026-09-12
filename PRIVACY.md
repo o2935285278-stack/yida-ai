@@ -2,7 +2,7 @@
 
 Yida AI is local-first for caption-text processing, retrieval and optional
 history. Windows speech recognition is local; external translation and AI
-providers are not. This policy describes v0.2.2-beta behavior as implemented.
+providers are not. This policy describes v0.2.3-beta preview behavior as implemented.
 
 ## Data flow
 
@@ -15,7 +15,9 @@ providers are not. This policy describes v0.2.2-beta behavior as implemented.
 
 Yida AI does not capture audio or open the microphone itself. Windows Live
 Captions handles audio and produces text. Yida AI reads text output through the
-LCT database adapter. Pausing Yida AI stops it processing new caption events;
+Windows caption window UI Automation adapter, or the optional LCT database adapter.
+The native source sends individual caption text to your configured AI endpoint
+for translation; this includes translation-only mode. Pausing Yida AI stops it processing new caption events;
 Windows and LCT may continue until the user stops them separately.
 
 ## Local data
@@ -46,8 +48,9 @@ This request is sent to the configured endpoint. Official DeepSeek and OpenAI
 endpoints process data under their own terms; a custom OpenAI-compatible endpoint
 is controlled by its operator. Yida AI does not proxy those requests. The
 provider's answer returns to Yida AI and may be saved locally only if history is
-enabled. **Translation-only** mode and the deterministic `mock` provider make no
-AI request.
+enabled. The deterministic `mock` provider makes no network requests.
+Translation-only mode skips reply generation, but native caption translation
+still requires an external request unless source and display languages match.
 
 LCT is a separate third-party process. Depending on its settings, it may send
 raw caption text to a translation provider such as Google or another service.

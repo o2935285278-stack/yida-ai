@@ -3,14 +3,20 @@
 > Hear the conversation, consult your material, and get a reply you can actually say.
 
 Yida AI is a multilingual real-time translation and document-assisted reply tool
-based on Windows Live Captions and translation services. It connects through
-[LiveCaptions Translator](https://github.com/SakiRinn/LiveCaptions-Translator),
+based on Windows Live Captions and translation services. It reads Windows captions
+directly, with [LiveCaptions Translator](https://github.com/SakiRinn/LiveCaptions-Translator)
+available as a compatibility option, and
 keeps bounded conversational context, retrieves relevant passages from local
 documents, and asks a user-configured AI provider for a grounded reply.
 
-This is a **v0.2.2-beta** project. It is not a speech-recognition engine and does
+This is a **v0.2.4-beta development preview** project. It is not a speech-recognition engine and does
 not promise perfect translation or zero latency. The current release candidate
 is **unsigned** and must not be represented as signed.
+
+The 0.2.4 UI preview simplifies the conversation page and nests diagnostics inside
+Settings. Automatic caption-window hiding is experimental and opt-in; live
+hidden-window recognition and the microphone quick toggle remain incomplete.
+See [verification limitations](docs/VERIFICATION-0.2.4-preview.md).
 
 Official repository: <https://github.com/o2935285278-stack/yida-ai>. Use only
 its [Releases](https://github.com/o2935285278-stack/yida-ai/releases)
@@ -21,7 +27,8 @@ and verify the published SHA-256. Reposted binaries are not official builds.
 ## Responsibilities
 
 - **Windows Live Captions** performs on-device speech recognition for system audio or microphone input.
-- **LiveCaptions Translator** is the default caption/translation source and stores the records read by `LiveCaptionsTranslatorSource`.
+- **WindowsCaptionSource** reads the Windows caption window via UI Automation in the Yida process. Translation uses your configured AI endpoint and key.
+- **LiveCaptions Translator** is an optional compatibility source; existing configurations are preserved on upgrade. Select `windows-captions` in settings to use the new source.
 - **Yida AI** adds caption normalization, deduplication, conversation context, document retrieval, AI reply suggestions, citations, privacy controls, history and export.
 
 The Windows installer redistributes an unmodified upstream LCT executable as a

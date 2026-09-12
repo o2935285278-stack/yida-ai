@@ -41,9 +41,17 @@ class ApplicationController:
                 incoming = []
                 errors.append(str(exc))
             for event in incoming:
+                if event.source == "windows-captions" or event.revision_of == event.event_id:
+                    captions.append(event)
+                    continue
                 captions.extend(self.assembler.accept(event, now=now))
             captions.extend(self.assembler.flush_ready(now=now))
             for event in captions:
+                if event.revision_of == event.event_id:
+                    for turn in self.engine.conversation.turns:
+                        if turn.event.event_id == event.event_id:
+                            turn.event = event
+                    continue
                 self._record_or_generate(event)
         results = self.engine.drain_results()
         return ControllerUpdate(tuple(captions), tuple(results), tuple(errors))

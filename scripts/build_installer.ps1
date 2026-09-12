@@ -118,9 +118,9 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Inno Setup build failed" }
 
     $InstallerName = if ($QaBuild) {
-        "YidaAI-0.2.2-beta-win-x64-qa-setup.exe"
+        "YidaAI-0.2.4-beta-win-x64-qa-setup.exe"
     } else {
-        "YidaAI-0.2.2-beta-win-x64-setup.exe"
+        "YidaAI-0.2.4-beta-win-x64-setup.exe"
     }
     $Installer = Join-Path $RepoRoot "dist\installer\$InstallerName"
     if (-not (Test-Path -LiteralPath $Installer)) {

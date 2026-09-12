@@ -8,7 +8,8 @@
 - Distributed version: `1.7.1300.1822`
 - Verified SHA-256: `62A5C9AC04FA48EC89A28168BB5835745DD332497CA1EF6184498E6565B4CB31`
 - License verified from that tag and the official repository: Apache License 2.0
-- Role: receives Windows Live Captions and provides the default caption/translation data source.
+- Role: optional compatibility caption/translation source. The default source in
+  0.2.3-beta reads Windows Live Captions directly using independently written UI Automation code.
 
 The Windows installer redistributes the unmodified upstream executable under
 `components/LiveCaptionsTranslator`. Yida AI starts that separate process in the
@@ -34,6 +35,15 @@ installer. It is not application runtime code and does not change the selected
 Yida AI interface language.
 
 Runtime/development Python packages and their own license texts remain governed by their respective distributions. Release builders should review the generated bundle before distribution.
+
+## comtypes and tkinterdnd2
+
+- comtypes 1.4.16: MIT, https://github.com/enthought/comtypes . Provides Windows
+  COM/UI Automation bindings; license bundled as `licenses/comtypes-LICENSE.txt`.
+- tkinterdnd2 0.6.3: MIT, https://github.com/Eliav2/tkinterdnd2 . Provides Tk drag
+  and drop support; license bundled as `licenses/tkinterdnd2-LICENSE.txt`.
+
+These packages are unmodified dependencies, not copied LCT source code.
 
 ## Packaged Python runtime and libraries
 

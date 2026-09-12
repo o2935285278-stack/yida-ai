@@ -38,6 +38,50 @@ class FakeWindows:
         return True
 
 
+def test_quiet_start_preserves_external_caption_window(monkeypatch):
+    monkeypatch.setattr("yida_ai.system.windows_captions._is_supported_windows", lambda: True)
+    windows = FakeWindows()
+    manager = WindowsCaptionManager(show_window=False,
+        process_probe=lambda: (WindowsCaptionProcess(99),), window_controller=windows,
+        readable_probe=lambda: True)
+    manager.ensure_running()
+    assert not windows.hidden
+    manager.close()
+    assert not windows.closed
+
+
+def test_quiet_start_restores_window_when_hidden_read_fails(monkeypatch):
+    monkeypatch.setattr("yida_ai.system.windows_captions._is_supported_windows", lambda: True)
+    processes = []
+    windows = FakeWindows()
+    readings = iter([True, False])
+    manager = WindowsCaptionManager(show_window=False,
+        process_probe=lambda: tuple(processes),
+        starter=lambda: processes.append(WindowsCaptionProcess(77)),
+        window_controller=windows, readable_probe=lambda: next(readings))
+    assert manager.ensure_running().state is WindowsCaptionState.FAILED
+    assert windows.hidden == [77]
+    assert windows.visible
+    manager.refresh()
+    assert windows.hidden == [77]
+
+
+def test_quiet_start_waits_for_readable_caption_surface(monkeypatch):
+    monkeypatch.setattr("yida_ai.system.windows_captions._is_supported_windows", lambda: True)
+    processes = []
+    windows = FakeWindows()
+    ready = [False]
+    manager = WindowsCaptionManager(show_window=False,
+        process_probe=lambda: tuple(processes),
+        starter=lambda: processes.append(WindowsCaptionProcess(88)),
+        window_controller=windows, readable_probe=lambda: ready[0])
+    manager.ensure_running()
+    assert not windows.hidden
+    ready[0] = True
+    assert manager.refresh().state is WindowsCaptionState.HIDDEN
+    assert windows.hidden == [88]
+
+
 def test_existing_windows_captions_is_hidden_then_restored(monkeypatch):
     monkeypatch.setattr("yida_ai.system.windows_captions._is_supported_windows", lambda: True)
     windows = FakeWindows()

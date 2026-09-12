@@ -52,7 +52,7 @@ def test_release_inputs_and_dependencies_are_hash_locked():
     assert "innosetup-6.7.3.exe" in inno_fetch
     packages = [line for line in lock.splitlines() if "==" in line and not line.startswith("#")]
     hashes = [line for line in lock.splitlines() if "--hash=sha256:" in line]
-    assert len(packages) == len(hashes) == 8
+    assert len(packages) == len(hashes) == 10
 
 
 def test_codeowners_protects_signing_and_workflow_files():

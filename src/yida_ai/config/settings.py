@@ -38,7 +38,7 @@ class LLMSettings:
 
 @dataclass(slots=True)
 class CaptionSourceSettings:
-    kind: str = "livecaptions-translator"
+    kind: str = "windows-captions"
     database_path: str = ""
     poll_interval_ms: int = 180
     auto_start_windows_captions: bool = True

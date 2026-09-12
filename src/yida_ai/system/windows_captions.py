@@ -14,6 +14,22 @@ from typing import Protocol
 WINDOWS_CAPTION_IMAGE = "LiveCaptions.exe"
 
 
+def _caption_text_readable() -> bool:
+    """Leave first-run/download dialogs visible until the text surface exists."""
+    from yida_ai.adapters.captions.windows_native import WindowsTextReader
+
+    reader = None
+    try:
+        reader = WindowsTextReader()
+        reader.read()
+        return True
+    except Exception:
+        return False
+    finally:
+        if reader is not None:
+            reader.close()
+
+
 class WindowsCaptionState(StrEnum):
     UNSUPPORTED = "unsupported"
     STOPPED = "stopped"
@@ -124,6 +140,7 @@ class WindowsCaptionManager:
         window_controller: CaptionWindowController | None = None,
         clock: Callable[[], float] = time.monotonic,
         start_timeout_seconds: float = 12.0,
+        readable_probe: Callable[[], bool] = _caption_text_readable,
     ) -> None:
         self.auto_start = auto_start
         self.show_window = show_window
@@ -132,6 +149,8 @@ class WindowsCaptionManager:
         self._windows = window_controller or _Win32CaptionWindowController()
         self._clock = clock
         self.start_timeout_seconds = start_timeout_seconds
+        self._readable_probe = readable_probe
+        self._auto_hide_attempted: set[int] = set()
         self._initial_pids = {process.pid for process in process_probe()}
         self._owned_pids: set[int] = set()
         self._restore_visible_pids: set[int] = set()
@@ -325,6 +344,17 @@ class WindowsCaptionManager:
         pid = running[0].pid
         if apply_visibility and self.show_window:
             self._windows.show(pid)
+        if (not self.show_window and pid in self._owned_pids
+                and pid not in self._auto_hide_attempted and self._readable_probe()):
+            self._auto_hide_attempted.add(pid)
+            hidden = self.hide_window()
+            if hidden.state is WindowsCaptionState.HIDDEN and not self._readable_probe():
+                self.show_caption_window()
+                self._status = WindowsCaptionStatus(
+                    True, True, "隐藏后无法读取字幕，已恢复系统窗口",
+                    WindowsCaptionState.FAILED, pid, True, True,
+                )
+            return self._status
         visible = self._windows.is_visible(pid)
         state = WindowsCaptionState.RUNNING if visible else WindowsCaptionState.HIDDEN
         detail = "Windows 实时字幕窗口可见" if visible else "Windows 实时字幕在后台运行"

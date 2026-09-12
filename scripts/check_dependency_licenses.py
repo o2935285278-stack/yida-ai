@@ -6,6 +6,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 LOCK = ROOT / "requirements-build-win-py313.txt"
 EXPECTED = {
+    "comtypes": "MIT",
+    "tkinterdnd2": "MIT",
     "altgraph": "MIT",
     "packaging": "Apache-2.0 OR BSD-2-Clause",
     "pefile": "MIT",

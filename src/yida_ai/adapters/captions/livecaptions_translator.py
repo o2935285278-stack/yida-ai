@@ -133,6 +133,7 @@ class LiveCaptionsTranslatorSource(CaptionSource):
         self.source_language = source_language
         self.translated_language = translated_language
         self.last_row_id = 0
+        self._pending_translations: dict[int, float] = {}
         self._columns: dict[str, str] | None = None
         self.last_caption_at: datetime | None = None
         self.last_translation_at: datetime | None = None
@@ -208,27 +209,46 @@ class LiveCaptionsTranslatorSource(CaptionSource):
                 "正在等待 LiveCaptions Translator 生成字幕数据库；无需重启译答 AI。"
             )
         columns = self._resolve_columns()
+        import time
+        now = time.monotonic()
+        self._pending_translations = {
+            key: since for key, since in self._pending_translations.items()
+            if now - since < 60
+        }
+        pending = tuple(self._pending_translations)[:128]
+        placeholders = ",".join("?" for _ in pending) or "NULL"
         query = (
             f'SELECT "{columns["id"]}", "{columns["source"]}", '
             f'"{columns["translated"]}", "{columns.get("timestamp", columns["id"])}" '
-            f'FROM "{columns["table"]}" WHERE "{columns["id"]}" > ? '
+            f'FROM "{columns["table"]}" WHERE ("{columns["id"]}" > ? '
+            f'OR "{columns["id"]}" IN ({placeholders})) '
             f'ORDER BY "{columns["id"]}" ASC LIMIT ?'
         )
         try:
             with closing(self._connect_readonly()) as connection:
-                rows = connection.execute(query, (self.last_row_id, limit)).fetchall()
+                rows = connection.execute(
+                    query, (self.last_row_id, *pending, limit + len(pending))
+                ).fetchall()
         except sqlite3.Error as exc:
             raise CaptionSourceUnavailable(f"字幕数据库无法读取：{exc}") from exc
         events: list[CaptionEvent] = []
         for row_id, source, translated, timestamp in rows:
+            is_update = int(row_id) in self._pending_translations
             self.last_row_id = max(self.last_row_id, int(row_id))
             source_text = str(source or "").strip()
             translated_text, translation_error = _sanitize_translation(str(translated or ""))
+            if is_update and not translated_text:
+                continue
             if not source_text:
                 continue
             metadata: dict[str, object] = {"upstream_row_id": int(row_id)}
             if translation_error:
                 metadata["translation_error"] = translation_error
+            if translated_text:
+                self._pending_translations.pop(int(row_id), None)
+            elif len(self._pending_translations) < 128:
+                self._pending_translations[int(row_id)] = now
+                metadata["translation_pending"] = True
             occurred_at = _parse_timestamp(timestamp)
             self.last_caption_at = occurred_at
             if translated_text:
@@ -236,6 +256,7 @@ class LiveCaptionsTranslatorSource(CaptionSource):
             events.append(
                 CaptionEvent(
                     event_id=f"lct-{row_id}",
+                    revision_of=f"lct-{row_id}" if is_update else None,
                     source_text=source_text,
                     translated_text=translated_text,
                     source_language=self.source_language,

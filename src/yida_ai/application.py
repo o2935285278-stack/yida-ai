@@ -7,6 +7,8 @@ from yida_ai.adapters.captions import (
     LiveCaptionsTranslatorSource,
     MockCaptionSource,
 )
+from yida_ai.adapters.captions.translated import TranslatedCaptionSource
+from yida_ai.adapters.captions.windows_native import WindowsCaptionSource
 from yida_ai.components import LctComponentManager
 from yida_ai.config.settings import AppSettings, SettingsStore
 from yida_ai.core.captions import CaptionAssembler
@@ -68,6 +70,16 @@ def build_runtime(
             if mock_caption_path is not None
             else MockCaptionSource()
         )
+    elif settings.caption_source.kind == "windows-captions":
+        active_windows_manager = windows_caption_manager or WindowsCaptionManager(
+            auto_start=settings.caption_source.auto_start_windows_captions,
+            show_window=settings.caption_source.show_system_caption_window,
+        )
+        if start_components:
+            active_windows_manager.ensure_running()
+        caption_source = WindowsCaptionSource(
+            settings.speech_language, settings.translation_language
+        )
     else:
         active_windows_manager = windows_caption_manager or WindowsCaptionManager(
             auto_start=settings.caption_source.auto_start_windows_captions,
@@ -106,6 +118,9 @@ def build_runtime(
         )
     else:
         provider = MockLLMProvider()
+
+    if settings.caption_source.kind == "windows-captions" and not using_mock:
+        caption_source = TranslatedCaptionSource(caption_source, provider)
 
     conversation = ConversationManager(settings.context_turns)
     history = HistoryStore(

@@ -79,6 +79,15 @@ class KnowledgeLibrary:
         if source.suffix.lower() not in SUPPORTED_SUFFIXES:
             raise KnowledgeError("仅支持 TXT、Markdown 和可复制文本的 PDF")
         target = self.directory / source.name
+        if not read_document(source).strip():
+            raise KnowledgeError("Empty document / scanned PDF: no extractable text")
+        if target.exists() and source != target.resolve():
+            if source.read_bytes() == target.read_bytes():
+                return target
+            index = 2
+            while target.exists():
+                target = self.directory / f"{source.stem} ({index}){source.suffix}"
+                index += 1
         if source != target.resolve():
             shutil.copy2(source, target)
         return target

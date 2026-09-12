@@ -45,7 +45,7 @@ def _component(name: str, version: str, license_id: str, *, role: str) -> dict[s
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--version", default="0.2.2-beta")
+    parser.add_argument("--version", default="0.2.4-beta")
     parser.add_argument(
         "--allow-dirty",
         action="store_true",

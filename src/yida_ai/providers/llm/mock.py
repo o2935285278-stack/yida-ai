@@ -11,6 +11,9 @@ class MockLLMProvider(LLMProvider):
         self.fail = fail
         self.requests: list[ReplyRequest] = []
 
+    def translate_text(self, text: str, source_language: str, target_language: str) -> str:
+        return f"[Mock {target_language}] {text}"
+
     def generate(self, request: ReplyRequest) -> ReplySuggestion:
         self.requests.append(request)
         if self.fail:

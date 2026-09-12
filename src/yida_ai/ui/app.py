@@ -126,9 +126,9 @@ class YidaApp:
         self._refresh_status()
         self.root.protocol("WM_DELETE_WINDOW", self.close)
         self.root.after(self.runtime.settings.caption_source.poll_interval_ms, self._tick)
-        if self.startup_orchestrator is not None:
+        if self.runtime.windows_caption_manager is not None:
             self.root.after(150, self.start_all)
-        if self.runtime.settings.caption_source.kind != "mock":
+        if self.runtime.settings.caption_source.kind == "livecaptions-translator":
             self.root.after(400, self._start_caption_language_probe)
         current_component = next(
             (
@@ -159,15 +159,26 @@ class YidaApp:
         self.root.geometry(f"{metrics.width}x{metrics.height}")
         self.root.minsize(metrics.min_width, metrics.min_height)
         tkfont.nametofont("TkDefaultFont").configure(family="Microsoft YaHei UI", size=10)
+        style = ttk.Style(self.root)
+        if "vista" in style.theme_names():
+            style.theme_use("vista")
+        style.configure("TFrame", background="#f3f3f3")
+        style.configure("TLabel", background="#f3f3f3")
+        style.configure("Card.TFrame", background="#ffffff")
+        style.configure("Card.TLabel", background="#ffffff")
         notebook = ttk.Notebook(self.root)
         notebook.pack(fill="both", expand=True)
         self.notebook = notebook
         self.main_tab = ttk.Frame(notebook, padding=12)
         self.settings_tab = ttk.Frame(notebook, padding=12)
-        self.diagnostics_tab = ttk.Frame(notebook, padding=12)
         notebook.add(self.main_tab, text=self._t("main_tab"))
         notebook.add(self.settings_tab, text=self._t("settings_tab"))
-        notebook.add(self.diagnostics_tab, text=self._t("diagnostics_tab"))
+        settings_sections = ttk.Notebook(self.settings_tab)
+        settings_sections.pack(fill="both", expand=True)
+        self.settings_content_tab = ttk.Frame(settings_sections, padding=8)
+        self.diagnostics_tab = ttk.Frame(settings_sections, padding=8)
+        settings_sections.add(self.settings_content_tab, text=self._t("settings_tab"))
+        settings_sections.add(self.diagnostics_tab, text=self._t("diagnostics_tab"))
         self._build_main_tab()
         self._build_settings_tab()
         self._build_diagnostics_tab()
@@ -179,18 +190,13 @@ class YidaApp:
         ttk.Label(header, text="Yida AI", font=("Microsoft YaHei UI", 18, "bold")).grid(
             row=0, column=0, sticky="w"
         )
-        ttk.Label(
-            header,
-            text=self._t("tagline"),
-            foreground="#52606d",
-            wraplength=470,
-            justify="left",
-        ).grid(row=0, column=1, sticky="w", padx=14)
+        preferences_header = ttk.Frame(self.diagnostics_tab)
+        preferences_header.pack(fill="x", pady=8)
         self.quick_interface_language = StringVar(
             value=language_name(self.runtime.settings.interface_language, self.locale)
         )
         interface_picker = ttk.Combobox(
-            header,
+            preferences_header,
             textvariable=self.quick_interface_language,
             values=tuple(language_name(code, self.locale) for code in SUPPORTED_SPEECH_LANGUAGES),
             state="readonly",
@@ -198,13 +204,13 @@ class YidaApp:
         )
         interface_picker.grid(row=0, column=3, sticky="e")
         interface_picker.bind("<<ComboboxSelected>>", self.quick_switch_interface_language)
-        ttk.Label(header, text=self._t("interface_language"), wraplength=150).grid(
+        ttk.Label(preferences_header, text=self._t("interface_language"), wraplength=150).grid(
             row=0, column=2, sticky="e", padx=6
         )
 
-        status = ttk.Frame(self.main_tab)
+        status = ttk.Frame(self.diagnostics_tab)
         status.pack(fill="x", pady=(10, 2))
-        status_more = ttk.Frame(self.main_tab)
+        status_more = ttk.Frame(self.diagnostics_tab)
         status_more.pack(fill="x", pady=(0, 8))
         self.source_status = StringVar(value=self._t("input_checking"))
         self.lct_status = StringVar(value=self._t("lct_checking"))
@@ -262,6 +268,14 @@ class YidaApp:
             command=self.quick_switch_speech_language,
         ).pack(side="left")
         self.caption_language_notice = StringVar(value="")
+        self.quick_reply_language = StringVar()
+        ttk.Label(language_controls, text=self._t("reply_language")).pack(side="left", padx=8)
+        reply_picker = ttk.Combobox(
+            language_controls, textvariable=self.quick_reply_language,
+            values=SUPPORTED_SPEECH_LANGUAGES, state="readonly", width=8,
+        )
+        reply_picker.pack(side="left")
+        reply_picker.bind("<<ComboboxSelected>>", self.quick_switch_reply_language)
         ttk.Label(
             language_controls,
             textvariable=self.caption_language_notice,
@@ -278,21 +292,23 @@ class YidaApp:
             controls, text=self._t("confirm_reply"), command=self.confirm_latest
         )
         self.confirm_button.pack(side="left", padx=6)
-        more = ttk.Menubutton(controls, text=self._t("more_actions"))
+        if self.runtime.settings.reply_mode != "confirm":
+            self.confirm_button.pack_forget()
+        more = ttk.Menubutton(preferences_header, text=self._t("more_actions"))
         more_menu = Menu(more, tearoff=False)
         more_menu.add_command(label=self._t("clear_session"), command=self.clear_session)
         more_menu.add_command(label=self._t("export_history"), command=self.export_history)
         more_menu.add_separator()
         more_menu.add_command(label=self._t("clear_history"), command=self.clear_history)
         more.configure(menu=more_menu)
-        more.pack(side="left", padx=6)
+        more.grid(row=0, column=0, padx=6)
         ttk.Button(
             controls,
             text=self._t("open_settings"),
             command=lambda: self.notebook.select(self.settings_tab),
         ).pack(side="right")
 
-        integration_controls = ttk.Frame(self.main_tab)
+        integration_controls = ttk.Frame(self.diagnostics_tab)
         integration_controls.pack(fill="x", pady=(0, 8))
         self.start_all_button = ttk.Button(
             integration_controls,
@@ -323,9 +339,10 @@ class YidaApp:
             self.main_tab,
             wrap="word",
             state="disabled",
-            background="#f7f9fc",
-            relief="solid",
-            borderwidth=1,
+            background="#f3f3f3",
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
             padx=12,
             pady=10,
         )
@@ -391,9 +408,9 @@ class YidaApp:
         self.diagnostics_text.pack(fill="both", expand=True)
 
     def _build_settings_tab(self) -> None:
-        settings_canvas = Canvas(self.settings_tab, highlightthickness=0)
+        settings_canvas = Canvas(self.settings_content_tab, highlightthickness=0)
         settings_scrollbar = ttk.Scrollbar(
-            self.settings_tab, orient="vertical", command=settings_canvas.yview
+            self.settings_content_tab, orient="vertical", command=settings_canvas.yview
         )
         settings_canvas.configure(yscrollcommand=settings_scrollbar.set)
         settings_scrollbar.pack(side="right", fill="y")
@@ -437,7 +454,8 @@ class YidaApp:
         self.auto_start_windows_captions = BooleanVar(value=True)
         self.show_system_caption_window = BooleanVar(value=True)
         rows = [
-            ("caption_source", self.caption_source_kind, ("livecaptions-translator", "mock"), True),
+            ("caption_source", self.caption_source_kind,
+             ("windows-captions", "livecaptions-translator", "mock"), True),
             (
                 "interface_language",
                 self.interface_language,
@@ -577,6 +595,10 @@ class YidaApp:
             SpeechComponentState.MISSING: self._t("component_missing"),
             SpeechComponentState.UNKNOWN: self._t("component_unknown"),
         }
+        ttk.Label(form, text=self._t("quiet_start_note"), wraplength=850).grid(
+            row=row, column=0, columnspan=6, sticky="w", padx=5, pady=5,
+        )
+        row += 1
         component_text = " / ".join(
             f"{item.language}: {component_labels[item.state]}" for item in self.speech_components
         )
@@ -603,6 +625,13 @@ class YidaApp:
         knowledge.pack(fill="both", expand=True, pady=(12, 0))
         self.knowledge_list = Listbox(knowledge, height=9)
         self.knowledge_list.pack(fill="both", expand=True, side="left")
+        ttk.Label(knowledge, text=self._t("drop_hint")).pack(fill="x")
+        if (hasattr(self.knowledge_list, "drop_target_register")
+                and self.root.tk.call("info", "commands", "tkdnd::drop_target")):
+            self.knowledge_list.drop_target_register("DND_Files")
+            self.knowledge_list.dnd_bind(
+                "<<Drop>>", lambda event: self.import_paths(self.root.tk.splitlist(event.data))
+            )
         knowledge_buttons = ttk.Frame(knowledge)
         knowledge_buttons.pack(side="right", fill="y", padx=(10, 0))
         ttk.Button(
@@ -630,6 +659,7 @@ class YidaApp:
         self.quick_speech_language.set(language_name(settings.speech_language, self.locale))
         self.translation_language.set(settings.translation_language)
         self.reply_language.set(settings.reply_language)
+        self.quick_reply_language.set(settings.reply_language)
         self.interface_language.set(settings.interface_language)
         self.scene.set(scene_name(self.locale, settings.scene))
         self.custom_scene_instruction.set(settings.custom_scene_instruction)
@@ -691,19 +721,33 @@ class YidaApp:
             self.settings_store.save(settings)
             previous_manager = self.runtime.lct_manager
             previous_windows = self.runtime.windows_caption_manager
+            if previous_windows is not None:
+                previous_windows.show_window = settings.caption_source.show_system_caption_window
             self.runtime.controller.close()
             use_previous_manager = settings.caption_source.kind == "livecaptions-translator"
+            use_previous_windows = settings.caption_source.kind != "mock"
             if previous_manager is not None and not use_previous_manager:
                 previous_manager.close()
-            if previous_windows is not None and not use_previous_manager:
+            if previous_windows is not None and not use_previous_windows:
                 previous_windows.close()
             self.runtime = build_runtime(
                 self.settings_store,
                 mock_caption_path=self.mock_path,
                 no_start_lct=self.no_start_lct,
                 lct_manager=previous_manager if use_previous_manager else None,
-                windows_caption_manager=previous_windows if use_previous_manager else None,
+                windows_caption_manager=previous_windows if use_previous_windows else None,
             )
+            # Never keep an orchestrator bound to the previous caption source.
+            self.startup_orchestrator = None
+            if self.runtime.windows_caption_manager and self.runtime.lct_manager:
+                self.startup_orchestrator = StartupOrchestrator(
+                    language=settings.speech_language,
+                    preflight=PreflightChecker(self.settings_store.data_dir),
+                    windows=self.runtime.windows_caption_manager,
+                    lct=self.runtime.lct_manager,
+                    source=self.runtime.controller.source,
+                    ai_ready=lambda: self.ai_connection_state is AIConnectionState.VERIFIED,
+                )
             self._refresh_status()
             self.key_status.set(
                 self._t("saved_key")
@@ -714,7 +758,11 @@ class YidaApp:
             suffix = self._t("ui_restart") if settings.interface_language != self.locale else ""
             self.bottom_status.set(f"{self._t('settings_saved')}{suffix}")
             self.quick_speech_language.set(language_name(settings.speech_language, self.locale))
-            if settings.caption_source.kind != "mock":
+            if settings.reply_mode == "confirm":
+                self.confirm_button.pack(side="left", padx=6)
+            else:
+                self.confirm_button.pack_forget()
+            if settings.caption_source.kind == "livecaptions-translator":
                 self._start_caption_language_probe()
             else:
                 self.caption_language_notice.set("")
@@ -752,17 +800,51 @@ class YidaApp:
         )
         if selected not in SUPPORTED_SPEECH_LANGUAGES:
             return
-        self.speech_language.set(selected)
-        component = check_speech_component(selected)
-        if component.state is SpeechComponentState.MISSING:
-            message = self._t(
-                "speech_missing",
-                languages=language_name(selected, self.locale),
-            )
-            if messagebox.askyesno(self._t("app_title"), message):
-                open_windows_language_settings()
+        if self.runtime.settings.caption_source.kind == "mock":
+            self.speech_language.set(selected)
+            self.apply_settings()
             return
-        self.apply_settings()
+        if getattr(self, "_switching_language", False):
+            return
+        self._switching_language = True
+        self.bottom_status.set(self._t("switching"))
+        controller = self.runtime.controller
+        was_paused = controller.paused
+        controller.paused = True
+        def work():
+            from yida_ai.system.native_language import switch_caption_language
+            try:
+                component = check_speech_component(selected)
+                if component.state is SpeechComponentState.MISSING:
+                    return False
+                return switch_caption_language(selected)
+            except Exception:
+                return False
+        def done(ok):
+            self._switching_language = False
+            if ok:
+                self.speech_language.set(selected)
+                controller.clear_session()
+                self.apply_settings()
+                self.runtime.controller.paused = was_paused
+                self.bottom_status.set(self._t("switch_done", language=selected))
+            else:
+                controller.paused = was_paused
+                self.bottom_status.set(self._t("switch_manual", language=selected))
+        self._background(work, done)
+
+    def quick_switch_reply_language(self, _event=None) -> None:
+        selected = self.quick_reply_language.get()
+        if selected not in SUPPORTED_SPEECH_LANGUAGES:
+            return
+        settings = self.runtime.settings
+        settings.reply_language = selected
+        self.settings_store.save(settings)
+        self.reply_language.set(selected)
+        engine = self.runtime.controller.engine
+        engine.reply_language = selected
+        engine.conversation.generation += 1
+        self.bottom_status.set(self._t("reply_language") + ": " + selected)
 
     def quick_switch_interface_language(self, _event: object | None = None) -> None:
         selected_label = self.quick_interface_language.get()
@@ -921,16 +1003,36 @@ class YidaApp:
             self.database_path.set(path)
 
     def import_document(self) -> None:
-        path = filedialog.askopenfilename(
+        paths = filedialog.askopenfilenames(
             filetypes=[(self._t("knowledge_files"), "*.txt *.md *.pdf")]
         )
-        if not path:
+        if not paths:
             return
-        try:
-            self.runtime.knowledge_library.import_document(Path(path))
+        self.import_paths(paths)
+
+    def import_paths(self, paths) -> None:
+        if getattr(self, "_importing", False):
+            return
+        self._importing = True
+        library = self.runtime.knowledge_library
+        self.bottom_status.set(self._t("import_progress"))
+        def work():
+            count, errors = 0, []
+            for path in paths:
+                try:
+                    library.import_document(Path(path))
+                    count += 1
+                except Exception as exc:
+                    errors.append(f"{Path(path).name}: {exc}")
+            return count, errors
+        def done(result):
+            self._importing = False
             self.reindex()
-        except (OSError, KnowledgeError) as exc:
-            messagebox.showerror(APP_TITLE, str(exc))
+            count, errors = result
+            self.bottom_status.set(self._t("import_done", count=count, errors=len(errors)))
+            if errors:
+                messagebox.showerror(APP_TITLE, "\n".join(errors))
+        self._background(work, done)
 
     def delete_document(self) -> None:
         selection = self.knowledge_list.curselection()
@@ -1016,6 +1118,13 @@ class YidaApp:
     def start_all(self) -> None:
         orchestrator = self.startup_orchestrator
         if orchestrator is None:
+            if self.runtime.windows_caption_manager:
+                manager = self.runtime.windows_caption_manager
+                self._background(
+                    manager.retry_start,
+                    lambda status: self.bottom_status.set(status.detail),
+                )
+                return
             self.bottom_status.set(self._t("mock_no_windows"))
             return
         if self._startup_worker_running:
@@ -1179,7 +1288,16 @@ class YidaApp:
         self.root.after(self.runtime.settings.caption_source.poll_interval_ms, self._tick)
 
     def _show_caption(self, event: CaptionEvent) -> None:
-        card = ttk.Frame(self.timeline, padding=14, relief="solid", borderwidth=1)
+        if event.event_id in self.pending_cards:
+            card = self.pending_cards[event.event_id]
+            card["translation"].set(self._translation_text(event))
+            button = card["translation_button"]
+            button.configure(command=lambda: self._copy_to_clipboard(event.translated_text))
+            if event.translated_text:
+                button.state(["!disabled"])
+            return
+        follow_latest = self.timeline.yview()[1] >= .98
+        card = ttk.Frame(self.timeline, padding=16, style="Card.TFrame")
         card.columnconfigure(0, weight=1)
         ttk.Label(
             card,
@@ -1199,9 +1317,10 @@ class YidaApp:
             foreground="#475467",
             font=("Microsoft YaHei UI", 9, "bold"),
         ).grid(row=2, column=0, sticky="w")
+        translation_var = StringVar(value=self._translation_text(event))
         ttk.Label(
             card,
-            text=event.translated_text or self._t("no_translation"),
+            textvariable=translation_var,
             wraplength=920,
             justify="left",
         ).grid(row=3, column=0, sticky="ew", pady=(3, 12))
@@ -1230,15 +1349,23 @@ class YidaApp:
             justify="left",
         ).grid(row=7, column=0, sticky="ew", pady=(0, 8))
         evidence_var = StringVar(value="")
-        ttk.Label(
+        evidence_label = ttk.Label(
             card,
             textvariable=evidence_var,
             foreground="#667085",
             wraplength=920,
             justify="left",
-        ).grid(row=8, column=0, sticky="ew", pady=(0, 8))
+        )
+        def toggle_details():
+            if evidence_label.winfo_manager():
+                evidence_label.grid_remove()
+                buttons.grid_remove()
+            else:
+                evidence_label.grid(row=8, column=0, sticky="ew", pady=(0, 8))
+                buttons.grid(row=10, column=0, sticky="w", pady=5)
+        primary_actions = ttk.Frame(card, style="Card.TFrame")
+        primary_actions.grid(row=9, column=0, sticky="w")
         buttons = ttk.Frame(card)
-        buttons.grid(row=9, column=0, sticky="w")
         ttk.Button(
             buttons,
             text=self._t("copy_source"),
@@ -1252,20 +1379,35 @@ class YidaApp:
         if not event.translated_text:
             translation_button.state(["disabled"])
         translation_button.pack(side="left", padx=6)
-        reply_button = ttk.Button(buttons, text=self._t("copy_reply"))
+        reply_button = ttk.Button(primary_actions, text=self._t("copy_reply"))
         reply_button.state(["disabled"])
         reply_button.pack(side="left")
+        convert_button = ttk.Button(
+            primary_actions, text=self._t("convert_reply"), state="disabled",
+            command=lambda: self.convert_reply(event.event_id),
+        )
+        convert_button.pack(side="left", padx=6)
+        ttk.Button(
+            primary_actions, text=self._t("message_details"), command=toggle_details,
+        ).pack(side="left")
+        for child in card.winfo_children():
+            if isinstance(child, ttk.Label):
+                child.configure(style="Card.TLabel")
         self.timeline.configure(state="normal")
         self.timeline.window_create("end", window=card, padx=8, pady=8)
         self.timeline.insert("end", "\n")
         self.timeline.configure(state="disabled")
-        self.timeline.see("end")
+        if follow_latest:
+            self.timeline.see("end")
         self.pending_cards[event.event_id] = {
+            "translation": translation_var,
+            "translation_button": translation_button,
             "frame": card,
             "reply": reply_var,
             "explanation": explanation_var,
             "evidence": evidence_var,
             "reply_button": reply_button,
+            "convert_button": convert_button,
         }
         if self.runtime.settings.reply_mode == "confirm":
             self.bottom_status.set(self._t("confirm_hint"))
@@ -1293,6 +1435,55 @@ class YidaApp:
         if result.warning:
             self._write_timeline(f"{self._t('storage_warning', detail=result.warning)}\n", "error")
             self.bottom_status.set(result.warning)
+
+    def _translation_text(self, event: CaptionEvent) -> str:
+        if event.translated_text:
+            return event.translated_text
+        if event.metadata.get("translation_error"):
+            return self._t("translation_failed", detail=event.metadata["translation_error"])
+        return self._t("translation_pending")
+
+    def _background(self, work, done) -> None:
+        results = queue.Queue()
+        def worker():
+            try:
+                results.put((True, work()))
+            except Exception as exc:
+                results.put((False, str(exc)))
+        def poll():
+            if self._closed:
+                return
+            try:
+                ok, value = results.get_nowait()
+            except queue.Empty:
+                self.root.after(50, poll)
+                return
+            if ok:
+                done(value)
+            else:
+                self.bottom_status.set(str(value))
+        threading.Thread(target=worker, daemon=True).start()
+        self.root.after(50, poll)
+
+    def convert_reply(self, event_id: str) -> None:
+        card = self.pending_cards.get(event_id)
+        if not card:
+            return
+        text = card["reply"].get()
+        provider = self.runtime.controller.engine.provider
+        if not hasattr(provider, "translate_text"):
+            return
+        target = self.runtime.settings.reply_language
+        generation = self.runtime.controller.engine.conversation.generation
+        self.bottom_status.set(self._t("translation_pending"))
+        def done(value):
+            if (generation != self.runtime.controller.engine.conversation.generation
+                    or self.pending_cards.get(event_id) is not card):
+                return
+            card["reply"].set(value)
+            card["reply_button"].configure(command=lambda: self._copy_to_clipboard(value))
+            self.bottom_status.set(self._t("settings_saved"))
+        self._background(lambda: provider.translate_text(text, "auto", target), done)
 
     def _show_suggestion(self, event: CaptionEvent, suggestion: ReplySuggestion) -> None:
         card = self.pending_cards.get(event.event_id)
@@ -1325,6 +1516,7 @@ class YidaApp:
         )
         reply_button.configure(command=lambda: self._copy_to_clipboard(suggestion.translated_reply))
         reply_button.state(["!disabled"])
+        card["convert_button"].state(["!disabled"])
 
     def _copy_to_clipboard(self, value: str) -> None:
         self.root.clipboard_clear()
@@ -1344,10 +1536,12 @@ class YidaApp:
         self.bottom_status.set(self._t("waiting"))
 
     def _write_timeline(self, text: str, tag: str | None = None) -> None:
+        follow_latest = not hasattr(self.timeline, "yview") or self.timeline.yview()[1] >= .98
         self.timeline.configure(state="normal")
         self.timeline.insert("end", text, tag or ())
         self.timeline.configure(state="disabled")
-        self.timeline.see("end")
+        if follow_latest:
+            self.timeline.see("end")
 
     def _refresh_status(self) -> None:
         self._refresh_live_status()
@@ -1414,7 +1608,10 @@ class YidaApp:
             self.windows_status.set(labels[windows.state])
         manager = self.runtime.lct_manager
         if manager is None:
-            self.lct_status.set(self._t("lct_mock"))
+            self.lct_status.set(self._t(
+                "native_source" if self.runtime.settings.caption_source.kind == "windows-captions"
+                else "lct_mock"
+            ))
             return
         status = manager.refresh()
         labels = {
@@ -1482,7 +1679,8 @@ def run_gui(
     *,
     no_start_lct: bool = False,
 ) -> None:
-    root = Tk()
+    from tkinterdnd2 import TkinterDnD
+    root = TkinterDnD.Tk()
     current_app: list[YidaApp | None] = [None]
 
     def clear_root() -> None:
