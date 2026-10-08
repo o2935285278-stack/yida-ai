@@ -106,37 +106,77 @@ class WindowsCaptionSource(CaptionSource):
         self._stop = threading.Event()
         self._error = ""
         self._ready = False
+        self._epoch = 0
+        self._connected = False
+        self._detail = "connecting"
         self._last = None
         self._factory = reader_factory
         self._thread = threading.Thread(target=self._run, name="yida-captions", daemon=True)
         self._thread.start()
 
     def _run(self) -> None:
-        reader = None
         segments = SnapshotSegments()
+        outage = False
+        while not self._stop.is_set():
+            reader = None
+            try:
+                reader = self._factory()
+                self._connected = True
+                self._detail = "waiting-audio"
+                if outage:
+                    self._epoch += 1
+                    outage = False
+                    segments = SnapshotSegments(segments.settle, segments.max_wait)
+                while not self._stop.is_set():
+                    try:
+                        text = segments.accept(reader.read(), time.monotonic())
+                        self._ready = True
+                        self._connected = True
+                        self._detail = "receiving" if text else "waiting-audio"
+                        self._error = ""
+                        if text:
+                            event = CaptionEvent(
+                                source_text=text, source_language=self.source_language,
+                                translated_language=self.translated_language,
+                                source="windows-captions",
+                                metadata={"epoch": self._epoch},
+                            )
+                            self._enqueue(event)
+                            self._last = event.occurred_at
+                    except Exception as exc:
+                        self._error = type(exc).__name__
+                        self._connected = False
+                        self._detail = "reconnecting"
+                        if not outage:
+                            self._epoch += 1
+                            outage = True
+                        break
+                    self._stop.wait(0.15)
+            except Exception as exc:
+                self._error = type(exc).__name__
+                self._connected = False
+                self._detail = "reconnecting"
+                if not outage:
+                    self._epoch += 1
+                    outage = True
+            finally:
+                if reader is not None:
+                    try:
+                        reader.close()
+                    except Exception:
+                        pass
+            if not self._stop.is_set():
+                self._stop.wait(0.5)
+
+    def _enqueue(self, event: CaptionEvent) -> None:
         try:
-            reader = self._factory()
-            while not self._stop.is_set():
-                try:
-                    text = segments.accept(reader.read(), time.monotonic())
-                    self._ready = True
-                    self._error = ""
-                    if text:
-                        event = CaptionEvent(
-                            source_text=text, source_language=self.source_language,
-                            translated_language=self.translated_language,
-                            source="windows-captions",
-                        )
-                        self._events.put(event, timeout=0.2)
-                        self._last = event.occurred_at
-                except Exception as exc:
-                    self._error = type(exc).__name__
-                self._stop.wait(0.15)
-        except Exception as exc:
-            self._error = type(exc).__name__
-        finally:
-            if reader is not None:
-                reader.close()
+            self._events.put_nowait(event)
+        except queue.Full:
+            try:
+                self._events.get_nowait()
+            except queue.Empty:
+                pass
+            self._events.put_nowait(event)
 
     def poll(self, limit: int = 50) -> list[CaptionEvent]:
         result = []
@@ -147,12 +187,18 @@ class WindowsCaptionSource(CaptionSource):
                 break
         return result
 
+    @property
+    def epoch(self) -> int:
+        return self._epoch
+
     def status(self) -> CaptionSourceStatus:
         return CaptionSourceStatus(
-            self._ready and not self._error, "Windows Live Captions", self._error,
-            CaptionActivityState.ERROR if self._error else (
+            self._connected,
+            "Windows Live Captions",
+            self._detail,
+            CaptionActivityState.ERROR if self._error and not self._connected else (
                 CaptionActivityState.RECEIVING if self._last else CaptionActivityState.WAITING_AUDIO
-            ), process_running=self._ready, live=bool(self._last), last_caption_at=self._last,
+            ), process_running=self._connected, live=bool(self._last), last_caption_at=self._last,
         )
 
     def close(self) -> None:

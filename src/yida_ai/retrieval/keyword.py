@@ -25,20 +25,32 @@ class KeywordRetriever(KnowledgeRetriever):
     def __init__(self) -> None:
         self.chunks: list[tuple[DocumentChunk, frozenset[str]]] = []
         self.index_errors: list[str] = []
+        self._cache: dict[Path, tuple[tuple[int, int], list]] = {}
 
     def index_directory(self, directory: Path) -> int:
         indexed: list[tuple[DocumentChunk, frozenset[str]]] = []
         self.index_errors = []
+        cache = {}
         if directory.exists():
             for path in sorted(directory.iterdir()):
                 if not path.is_file():
                     continue
                 try:
-                    chunks = load_chunks(path)
+                    stat = path.stat()
+                    signature = (stat.st_mtime_ns, stat.st_size)
+                    previous = self._cache.get(path)
+                    if previous and previous[0] == signature:
+                        entries = previous[1]
+                    else:
+                        chunks = load_chunks(path)
+                        entries = [(chunk, tokenize(f"{path.name} {chunk.text}"))
+                                   for chunk in chunks]
+                    cache[path] = (signature, entries)
                 except (OSError, RuntimeError) as exc:
                     self.index_errors.append(f"{path.name}: {exc}")
                     continue
-                indexed.extend((chunk, tokenize(f"{path.name} {chunk.text}")) for chunk in chunks)
+                indexed.extend(entries)
+        self._cache = cache
         self.chunks = indexed
         return len(indexed)
 

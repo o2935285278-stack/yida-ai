@@ -4,6 +4,17 @@ All notable changes follow Keep a Changelog conventions.
 
 ## [Unreleased]
 
+### 0.2.5-beta connection preview
+
+- Added read-only TranslationProgram IPC-v1 source with reconnect and replay suppression.
+- Debounced streaming replies, per-card manual reply/retry, and stale-result isolation.
+- Added revision-safe text pairing and current caption persistence.
+- Classified account quota errors separately and reset stale connection verification on changes.
+- Reused unchanged knowledge indexes and moved import parsing off the UI thread.
+- Updated the pypdf build lock and minimum dependency to 6.18.1.
+- Actual audio integration and microphone control remain unverified/unavailable;
+  see docs/RELEASE_NOTES_v0.2.5-beta.md for exact test scope.
+
 ### 0.2.4-beta UI preview
 
 - Simplified the conversation page and moved diagnostics/tools into Settings.

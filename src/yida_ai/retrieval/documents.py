@@ -3,11 +3,13 @@ from __future__ import annotations
 import hashlib
 import re
 import shutil
+import xml.etree.ElementTree as ET
+import zipfile
 from pathlib import Path
 
 from yida_ai.retrieval.base import DocumentChunk, KnowledgeError
 
-SUPPORTED_SUFFIXES = {".txt", ".md", ".pdf"}
+SUPPORTED_SUFFIXES = {".txt", ".md", ".pdf", ".docx", ".doc"}
 
 
 def read_document(path: Path) -> str:
@@ -21,7 +23,49 @@ def read_document(path: Path) -> str:
             raise KnowledgeError("PDF 支持需要安装可选依赖：pip install 'yida-ai[pdf]'") from exc
         reader = PdfReader(str(path))
         return "\n\n".join(page.extract_text() or "" for page in reader.pages)
+    if suffix == ".doc":
+        raise KnowledgeError("旧版 .doc 无法可靠解析，请在 Word 中另存为 .docx 后再导入")
+    if suffix == ".docx":
+        return _read_docx(path)
     raise KnowledgeError(f"不支持的资料格式：{suffix or '无扩展名'}")
+
+
+def _read_docx(path: Path) -> str:
+    """Extract paragraphs and table rows without requiring Microsoft Word."""
+    ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+    try:
+        with zipfile.ZipFile(path) as archive:
+            xml = archive.read("word/document.xml")
+        root = ET.fromstring(xml)
+    except (OSError, KeyError, zipfile.BadZipFile, ET.ParseError) as exc:
+        raise KnowledgeError("DOCX 文件损坏或无法读取，请重新保存后再试") from exc
+
+    blocks: list[str] = []
+    body = root.find("w:body", ns)
+    if body is None:
+        raise KnowledgeError("DOCX 缺少正文内容")
+    for element in body:
+        if element.tag == f"{{{ns['w']}}}p":
+            text = "".join(node.text or "" for node in element.findall(".//w:t", ns)).strip()
+            if text:
+                blocks.append(text)
+        elif element.tag == f"{{{ns['w']}}}tbl":
+            for row in element.findall("w:tr", ns):
+                cells = []
+                for cell in row.findall("w:tc", ns):
+                    value = " ".join(
+                        " ".join(
+                            "".join(
+                                node.text or "" for node in paragraph.findall(".//w:t", ns)
+                            ).split()
+                        )
+                        for paragraph in cell.findall("w:p", ns)
+                    ).strip()
+                    if value:
+                        cells.append(value)
+                if cells:
+                    blocks.append("\t".join(cells))
+    return "\n\n".join(blocks)
 
 
 def split_document(text: str, chunk_size: int = 700, overlap: int = 80) -> list[str]:
@@ -77,10 +121,14 @@ class KnowledgeLibrary:
     def import_document(self, source: Path) -> Path:
         source = source.resolve()
         if source.suffix.lower() not in SUPPORTED_SUFFIXES:
-            raise KnowledgeError("仅支持 TXT、Markdown 和可复制文本的 PDF")
+            raise KnowledgeError(
+                "仅支持 TXT、Markdown、DOCX 和可复制文本的 PDF；旧版 DOC 请另存为 DOCX"
+            )
         target = self.directory / source.name
         if not read_document(source).strip():
-            raise KnowledgeError("Empty document / scanned PDF: no extractable text")
+            if source.suffix.lower() == ".pdf":
+                raise KnowledgeError("PDF 没有可提取文字，扫描型 PDF 暂不支持 OCR")
+            raise KnowledgeError("资料为空，无法建立索引")
         if target.exists() and source != target.resolve():
             if source.read_bytes() == target.read_bytes():
                 return target

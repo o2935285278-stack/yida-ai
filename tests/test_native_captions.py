@@ -5,7 +5,8 @@ import pytest
 
 from yida_ai.adapters.captions.mock import MockCaptionSource
 from yida_ai.adapters.captions.translated import TranslatedCaptionSource
-from yida_ai.adapters.captions.windows_native import SnapshotSegments
+from yida_ai.adapters.captions.base import CaptionActivityState, CaptionSourceUnavailable
+from yida_ai.adapters.captions.windows_native import SnapshotSegments, WindowsCaptionSource
 from yida_ai.core.models import CaptionEvent
 from yida_ai.retrieval.documents import KnowledgeLibrary
 
@@ -68,6 +69,16 @@ def test_import_does_not_overwrite_same_name(tmp_path):
     assert second.read_text(encoding="utf-8") == "second"
 
 
+def test_scanned_pdf_error_explains_ocr_limit(tmp_path):
+    pypdf = pytest.importorskip("pypdf")
+    source = tmp_path / "scan.pdf"
+    writer = pypdf.PdfWriter()
+    with source.open("wb") as handle:
+        writer.write(handle)
+    with pytest.raises(Exception, match="扫描型 PDF.*OCR"):
+        KnowledgeLibrary(tmp_path / "knowledge").import_document(source)
+
+
 def test_lct_delayed_writeback(tmp_path):
     import sqlite3
 
@@ -105,5 +116,49 @@ def test_translation_failure_is_explicit():
             updates.extend(source.poll())
             time.sleep(.01)
         assert any(e.metadata.get("translation_error") == "offline" for e in updates)
+    finally:
+        source.close()
+
+
+def test_windows_source_reconnects_after_reader_failure():
+    created = []
+
+    class Reader:
+        def __init__(self, fail=False):
+            self.fail = fail
+            self.reads = 0
+
+        def read(self):
+            self.reads += 1
+            if self.fail:
+                raise CaptionSourceUnavailable("caption window closed")
+            return "Recovered caption"
+
+        def close(self):
+            return None
+
+    def factory():
+        reader = Reader(fail=not created)
+        created.append(reader)
+        return reader
+
+    source = WindowsCaptionSource("en-US", "zh-CN", reader_factory=factory)
+    try:
+        deadline = time.monotonic() + 3
+        event = None
+        while time.monotonic() < deadline and event is None:
+            events = source.poll()
+            if events:
+                event = events[0]
+                break
+            time.sleep(.05)
+        assert len(created) >= 2
+        assert source.epoch >= 2
+        assert event is not None
+        assert event.source_text == "Recovered caption"
+        assert source.status().activity in {
+            CaptionActivityState.RECEIVING,
+            CaptionActivityState.WAITING_AUDIO,
+        }
     finally:
         source.close()

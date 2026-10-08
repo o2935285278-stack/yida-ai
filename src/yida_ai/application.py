@@ -8,6 +8,7 @@ from yida_ai.adapters.captions import (
     MockCaptionSource,
 )
 from yida_ai.adapters.captions.translated import TranslatedCaptionSource
+from yida_ai.adapters.captions.translation_program import TranslationProgramSource
 from yida_ai.adapters.captions.windows_native import WindowsCaptionSource
 from yida_ai.components import LctComponentManager
 from yida_ai.config.settings import AppSettings, SettingsStore
@@ -70,6 +71,8 @@ def build_runtime(
             if mock_caption_path is not None
             else MockCaptionSource()
         )
+    elif settings.caption_source.kind == "translation-program":
+        caption_source = TranslationProgramSource()
     elif settings.caption_source.kind == "windows-captions":
         active_windows_manager = windows_caption_manager or WindowsCaptionManager(
             auto_start=settings.caption_source.auto_start_windows_captions,

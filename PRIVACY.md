@@ -4,6 +4,12 @@ Yida AI is local-first for caption-text processing, retrieval and optional
 history. Windows speech recognition is local; external translation and AI
 providers are not. This policy describes v0.2.3-beta preview behavior as implemented.
 
+0.2.5 addition: the optional translation-program source subscribes to recognized
+text and translations over a local Windows named pipe for the current account.
+Yida neither receives that program's keys nor configures its translation endpoint.
+Received captions may be sent to Yida's separately configured reply provider or
+saved when the user has enabled history, under the controls described below.
+
 ## Data flow
 
 | Part | Receives | Where processing occurs |

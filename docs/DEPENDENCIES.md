@@ -9,7 +9,7 @@ change fails until it receives a new review.
 
 | Package | Audited version | Purpose | Declared license |
 | --- | ---: | --- | --- |
-| pypdf | 6.15.0 | Optional extractable-text PDF support | BSD-3-Clause |
+| pypdf | 6.18.1 | Extractable-text PDF support | BSD-3-Clause |
 | PyInstaller | 6.22.0 | Windows build only | GPL-2.0-or-later with bootloader exception |
 | altgraph | 0.17.5 | PyInstaller build dependency | MIT |
 | packaging | 26.3 | Build dependency | Apache-2.0 OR BSD-2-Clause |

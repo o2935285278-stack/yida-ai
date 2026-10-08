@@ -95,7 +95,7 @@ def test_provider_failure_returns_error_without_crashing(event_factory):
     try:
         engine.submit(event_factory("bad"))
         results = _wait_results(engine, 1)
-        assert results[0].error == "simulated provider failure"
+        assert results[0].error == "AI request failed"
     finally:
         engine.shutdown()
 
@@ -160,6 +160,20 @@ def test_bounded_queue_discards_backlog_without_deadlock(event_factory):
         engine.submit(event_factory("three"))
         results = _wait_results(engine, 2)
         assert [result.request.event.event_id for result in results] == ["one", "three"]
+    finally:
+        engine.shutdown()
+
+
+def test_duplicate_event_submission_reuses_request_and_turn(event_factory):
+    engine = _engine(DelayedProvider({"same": 0.05}))
+    try:
+        event = event_factory("same", "Same question")
+        first = engine.submit(event)
+        second = engine.submit(event)
+        assert second == first
+        assert len(engine.conversation.turns) == 1
+        assert len(_wait_results(engine, 1)) == 1
+        assert engine.drain_results() == []
     finally:
         engine.shutdown()
 

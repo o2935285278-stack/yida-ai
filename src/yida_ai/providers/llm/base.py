@@ -13,6 +13,7 @@ class LLMErrorKind(StrEnum):
     MODEL_NOT_FOUND = "model-not-found"
     TIMEOUT = "timeout"
     RATE_LIMITED = "rate-limited"
+    QUOTA = "quota"
     SERVER_ERROR = "server-error"
     NETWORK = "network"
     INVALID_RESPONSE = "invalid-response"

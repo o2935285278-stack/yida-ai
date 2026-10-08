@@ -16,6 +16,7 @@ class AIConnectionState(StrEnum):
     INVALID_KEY = "invalid-key"
     MODEL_ERROR = "model-error"
     RATE_LIMITED = "rate-limited"
+    QUOTA = "quota"
     TIMEOUT = "timeout"
     SERVER_ERROR = "server-error"
     NETWORK_ERROR = "network-error"
@@ -58,6 +59,7 @@ def state_from_error(kind: LLMErrorKind) -> AIConnectionState:
         LLMErrorKind.INVALID_KEY: AIConnectionState.INVALID_KEY,
         LLMErrorKind.MODEL_NOT_FOUND: AIConnectionState.MODEL_ERROR,
         LLMErrorKind.RATE_LIMITED: AIConnectionState.RATE_LIMITED,
+        LLMErrorKind.QUOTA: AIConnectionState.QUOTA,
         LLMErrorKind.TIMEOUT: AIConnectionState.TIMEOUT,
         LLMErrorKind.SERVER_ERROR: AIConnectionState.SERVER_ERROR,
         LLMErrorKind.NETWORK: AIConnectionState.NETWORK_ERROR,

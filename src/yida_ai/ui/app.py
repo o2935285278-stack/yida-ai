@@ -97,12 +97,22 @@ class YidaApp:
         self.locale = self.runtime.settings.interface_language
         self.speech_components = check_speech_components()
         self.pending_cards: dict[str, dict[str, object]] = {}
+        self._card_order: list[str] = []
+        self._hidden_card_ids: set[str] = set()
+        self._new_content_count = 0
+        self._latest_event_id: str | None = None
+        self._latest_occurred_at: datetime | None = None
+        self.latest_original = StringVar(master=root, value=self._t("latest_waiting"))
+        self.latest_translation = StringVar(master=root, value=self._t("latest_waiting"))
+        self.latest_reply = StringVar(master=root, value=self._t("reply_pending"))
         self._ai_test_results: queue.Queue[tuple[bool, str, AIConnectionState, str, str]] = (
             queue.Queue()
         )
         self._caption_language_results: queue.Queue[str | None] = queue.Queue()
         self._startup_results: queue.Queue[object] = queue.Queue()
         self._startup_worker_running = False
+        self._import_updates: queue.Queue[tuple] = queue.Queue()
+        self._import_thread: threading.Thread | None = None
         self._closed = False
         self._next_system_refresh = 0.0
         self.ai_connection_state = derive_ai_status(
@@ -213,10 +223,14 @@ class YidaApp:
         status_more = ttk.Frame(self.diagnostics_tab)
         status_more.pack(fill="x", pady=(0, 8))
         self.source_status = StringVar(value=self._t("input_checking"))
+        ttk.Label(header, textvariable=self.source_status, wraplength=700).grid(
+            row=0, column=1, sticky="e", padx=12,
+        )
         self.lct_status = StringVar(value=self._t("lct_checking"))
         self.windows_status = StringVar(value=self._t("windows_checking"))
         self.language_status = StringVar(value=self._t("language_empty"))
         self.ai_status = StringVar(value=self._t("ai_waiting"))
+        ttk.Label(header, textvariable=self.ai_status).grid(row=1, column=1, sticky="e")
         self.knowledge_status = StringVar(value=self._t("knowledge_checking"))
         self.scene_status = StringVar(value=self._t("scene_empty"))
         status.columnconfigure(0, weight=1)
@@ -268,6 +282,8 @@ class YidaApp:
             command=self.quick_switch_speech_language,
         ).pack(side="left")
         self.caption_language_notice = StringVar(value="")
+        if self.runtime.settings.caption_source.kind == "translation-program":
+            self.caption_language_notice.set(self._t("external_languages"))
         self.quick_reply_language = StringVar()
         ttk.Label(language_controls, text=self._t("reply_language")).pack(side="left", padx=8)
         reply_picker = ttk.Combobox(
@@ -286,6 +302,16 @@ class YidaApp:
 
         controls = ttk.Frame(self.main_tab)
         controls.pack(fill="x", pady=(0, 8))
+        self.follow_latest = BooleanVar(value=self.runtime.settings.follow_latest)
+        ttk.Checkbutton(
+            controls, text="跟随最新", variable=self.follow_latest,
+            command=self._follow_setting_changed,
+        ).pack(side="left", padx=8)
+        self.new_content_button = ttk.Button(
+            controls, text="有新内容", command=self._return_to_latest,
+        )
+        self.new_content_button.pack(side="left", padx=8)
+        self.new_content_button.pack_forget()
         self.pause_button = ttk.Button(controls, text=self._t("pause"), command=self.toggle_pause)
         self.pause_button.pack(side="left")
         self.confirm_button = ttk.Button(
@@ -307,6 +333,42 @@ class YidaApp:
             text=self._t("open_settings"),
             command=lambda: self.notebook.select(self.settings_tab),
         ).pack(side="right")
+
+        latest_panel = ttk.LabelFrame(
+            self.main_tab, text=self._t("latest_item"), padding=(12, 8)
+        )
+        latest_panel.pack(fill="x", pady=(0, 8))
+        latest_panel.columnconfigure(0, weight=1)
+        ttk.Label(
+            latest_panel, text=self._t("original_caption"), foreground="#475467"
+        ).grid(row=0, column=0, sticky="w")
+        ttk.Label(
+            latest_panel, textvariable=self.latest_original, wraplength=980, justify="left"
+        ).grid(row=1, column=0, sticky="ew", pady=(2, 6))
+        ttk.Label(
+            latest_panel, text=self._t("translation"), foreground="#175cd3"
+        ).grid(row=2, column=0, sticky="w")
+        ttk.Label(
+            latest_panel,
+            textvariable=self.latest_translation,
+            wraplength=980,
+            justify="left",
+            font=("Microsoft YaHei UI", 12, "bold"),
+        ).grid(row=3, column=0, sticky="ew", pady=(2, 6))
+        ttk.Label(
+            latest_panel, text=self._t("reply_target"), foreground="#067647"
+        ).grid(row=4, column=0, sticky="w")
+        ttk.Label(
+            latest_panel,
+            textvariable=self.latest_reply,
+            wraplength=980,
+            justify="left",
+            foreground="#067647",
+        ).grid(row=5, column=0, sticky="ew", pady=(2, 0))
+        # The latest item must stay above the controls, not below them.  Pack
+        # supports reordering an already-created widget with ``before``.
+        latest_panel.pack_forget()
+        latest_panel.pack(fill="x", pady=(0, 8), before=language_controls)
 
         integration_controls = ttk.Frame(self.diagnostics_tab)
         integration_controls.pack(fill="x", pady=(0, 8))
@@ -335,8 +397,10 @@ class YidaApp:
             command=self.restart_windows_captions,
         ).grid(row=1, column=1, sticky="w", padx=6, pady=(5, 0))
 
+        timeline_frame = ttk.Frame(self.main_tab)
+        timeline_frame.pack(fill="both", expand=True)
         self.timeline = Text(
-            self.main_tab,
+            timeline_frame,
             wrap="word",
             state="disabled",
             background="#f3f3f3",
@@ -346,7 +410,11 @@ class YidaApp:
             padx=12,
             pady=10,
         )
-        self.timeline.pack(fill="both", expand=True)
+        scrollbar = ttk.Scrollbar(timeline_frame, orient="vertical", command=self.timeline.yview)
+        self.timeline.configure(yscrollcommand=scrollbar.set)
+        self.timeline.pack(fill="both", expand=True, side="left")
+        scrollbar.pack(fill="y", side="right")
+        self.timeline.bind("<MouseWheel>", self._on_timeline_scroll, add="+")
         self.timeline.tag_configure(
             "heading", font=("Microsoft YaHei UI", 10, "bold"), foreground="#175cd3"
         )
@@ -455,7 +523,7 @@ class YidaApp:
         self.show_system_caption_window = BooleanVar(value=True)
         rows = [
             ("caption_source", self.caption_source_kind,
-             ("windows-captions", "livecaptions-translator", "mock"), True),
+             ("translation-program", "windows-captions", "livecaptions-translator", "mock"), True),
             (
                 "interface_language",
                 self.interface_language,
@@ -640,6 +708,14 @@ class YidaApp:
         ttk.Button(
             knowledge_buttons, text=self._t("delete_document"), command=self.delete_document
         ).pack(fill="x", pady=6)
+        self.retry_import_button = ttk.Button(
+            knowledge_buttons, text="重试失败导入", command=self.retry_failed_imports,
+            state="disabled",
+        )
+        self.retry_import_button.pack(fill="x", pady=(0, 6))
+        ttk.Button(
+            knowledge_buttons, text="预览选中资料", command=self.preview_document,
+        ).pack(fill="x", pady=(0, 6))
         ttk.Button(knowledge_buttons, text=self._t("reindex"), command=self.reindex).pack(fill="x")
         ttk.Button(
             knowledge_buttons,
@@ -699,6 +775,7 @@ class YidaApp:
             self.reply_length.get(), REPLY_LENGTHS, reply_length_name
         )
         settings.context_turns = self.context_turns.get()
+        settings.follow_latest = bool(self.follow_latest.get())
         settings.caption_source.kind = self.caption_source_kind.get()
         settings.caption_source.database_path = self.database_path.get().strip()
         settings.caption_source.auto_start_windows_captions = self.auto_start_windows_captions.get()
@@ -714,6 +791,13 @@ class YidaApp:
         try:
             settings = self._settings_from_form()
             entered_key = self.api_key.get().strip()
+            previous_llm = self.runtime.settings.llm
+            if (entered_key or settings.llm.api_url != previous_llm.api_url
+                    or settings.llm.model != previous_llm.model
+                    or settings.llm.provider != previous_llm.provider):
+                settings.llm.last_verified_at = ""
+                settings.llm.last_verified_provider = ""
+                settings.llm.last_verified_model = ""
             if entered_key:
                 os.environ["YIDA_AI_API_KEY"] = entered_key
                 if self.persist_api_key.get():
@@ -725,7 +809,9 @@ class YidaApp:
                 previous_windows.show_window = settings.caption_source.show_system_caption_window
             self.runtime.controller.close()
             use_previous_manager = settings.caption_source.kind == "livecaptions-translator"
-            use_previous_windows = settings.caption_source.kind != "mock"
+            use_previous_windows = settings.caption_source.kind in {
+                "windows-captions", "livecaptions-translator"
+            }
             if previous_manager is not None and not use_previous_manager:
                 previous_manager.close()
             if previous_windows is not None and not use_previous_windows:
@@ -789,6 +875,9 @@ class YidaApp:
         self.reply_language.set(template.reply_language)
 
     def quick_switch_speech_language(self) -> None:
+        if self.runtime.settings.caption_source.kind == "translation-program":
+            self.bottom_status.set(self._t("external_languages"))
+            return
         selected_label = self.quick_speech_language.get()
         selected = next(
             (
@@ -1004,7 +1093,7 @@ class YidaApp:
 
     def import_document(self) -> None:
         paths = filedialog.askopenfilenames(
-            filetypes=[(self._t("knowledge_files"), "*.txt *.md *.pdf")]
+            filetypes=[(self._t("knowledge_files"), "*.txt *.md *.pdf *.docx *.doc")]
         )
         if not paths:
             return
@@ -1013,26 +1102,120 @@ class YidaApp:
     def import_paths(self, paths) -> None:
         if getattr(self, "_importing", False):
             return
+        unique_paths = []
+        seen = set()
+        for raw_path in paths:
+            path = Path(raw_path)
+            key = str(path.resolve()).casefold()
+            if key not in seen:
+                seen.add(key)
+                unique_paths.append(path)
+        if not unique_paths:
+            return
         self._importing = True
         library = self.runtime.knowledge_library
-        self.bottom_status.set(self._t("import_progress"))
+        retriever = self.runtime.retriever
+        total = len(unique_paths)
+        self.bottom_status.set(f"{self._t('import_progress')} 0/{total}")
         def work():
-            count, errors = 0, []
-            for path in paths:
+            count, errors, failed_paths = 0, [], []
+            self._import_updates.put(("queued", total))
+            for index, path in enumerate(unique_paths, 1):
+                self._import_updates.put(("parsing", index, total, path.name))
                 try:
-                    library.import_document(Path(path))
+                    library.import_document(path)
                     count += 1
+                    self._import_updates.put(("item", index, total, path.name, True, ""))
                 except Exception as exc:
-                    errors.append(f"{Path(path).name}: {exc}")
-            return count, errors
-        def done(result):
-            self._importing = False
-            self.reindex()
-            count, errors = result
-            self.bottom_status.set(self._t("import_done", count=count, errors=len(errors)))
-            if errors:
-                messagebox.showerror(APP_TITLE, "\n".join(errors))
-        self._background(work, done)
+                    detail = f"{path.name}: {exc}"
+                    errors.append(detail)
+                    failed_paths.append(path)
+                    self._import_updates.put(
+                        ("item", index, total, path.name, False, str(exc), str(path))
+                    )
+            index_error = ""
+            try:
+                self._import_updates.put(("indexing", count, total))
+                retriever.index_directory(library.directory)
+                index_error = retriever.index_errors[-1] if retriever.index_errors else ""
+            except Exception as exc:
+                index_error = str(exc)
+            self._import_updates.put(("done", count, errors, index_error, failed_paths))
+        self._import_thread = threading.Thread(target=work, name="yida-import", daemon=True)
+        self._import_thread.start()
+        self.root.after(50, self._poll_import_updates)
+
+    def _poll_import_updates(self) -> None:
+        errors = None
+        while True:
+            try:
+                update = self._import_updates.get_nowait()
+            except queue.Empty:
+                break
+            if update[0] == "queued":
+                self.bottom_status.set(f"排队中… 0/{update[1]}")
+            elif update[0] == "parsing":
+                _, index, total, name = update
+                self.bottom_status.set(f"解析中… {index}/{total} · {name}")
+            elif update[0] == "item":
+                _, index, total, name, success, detail, *_ = update
+                if success:
+                    self.bottom_status.set(
+                        f"{self._t('import_progress')} {index}/{total} · {name}"
+                    )
+                else:
+                    self.bottom_status.set(
+                        f"{self._t('import_progress')} {index}/{total} · {name}：{detail}"
+                    )
+            else:
+                if update[0] == "indexing":
+                    _, count, total = update
+                    self.bottom_status.set(f"建立索引中… {count}/{total}")
+                    continue
+                _, count, errors, index_error, failed_paths = update
+        if errors is None:
+            if not self._closed and getattr(self, "_importing", False):
+                self.root.after(50, self._poll_import_updates)
+            return
+        self._importing = False
+        self._import_thread = None
+        self._failed_import_paths = failed_paths
+        self.retry_import_button.state(["!disabled"] if self._failed_import_paths else ["disabled"])
+        self._refresh_knowledge_list()
+        document_count = len(self.runtime.knowledge_library.list_documents())
+        chunk_count = len(self.runtime.retriever.chunks)
+        error_count = len(self.runtime.retriever.index_errors)
+        self.knowledge_status.set(
+            self._t(
+                "knowledge_summary",
+                documents=document_count,
+                chunks=chunk_count,
+                errors=error_count,
+            )
+        )
+        final_errors = errors + ([f"建立索引：{index_error}"] if index_error else [])
+        self.bottom_status.set(self._t("import_done", count=count, errors=len(final_errors)))
+        if final_errors:
+            messagebox.showerror(APP_TITLE, "\n".join(final_errors))
+
+    def retry_failed_imports(self) -> None:
+        paths = getattr(self, "_failed_import_paths", [])
+        if paths:
+            self.import_paths(paths)
+
+    def preview_document(self) -> None:
+        selection = self.knowledge_list.curselection()
+        if not selection:
+            self.bottom_status.set("请选择资料后预览")
+            return
+        name = self.knowledge_list.get(selection[0])
+        path = self.runtime.knowledge_library.directory / name
+        try:
+            from yida_ai.retrieval.documents import read_document
+            text = read_document(path).strip()
+            messagebox.showinfo(APP_TITLE, text[:2000] or "资料为空")
+        except Exception as exc:
+            messagebox.showerror(APP_TITLE, str(exc))
 
     def delete_document(self) -> None:
         selection = self.knowledge_list.curselection()
@@ -1116,6 +1299,9 @@ class YidaApp:
         self._refresh_live_status()
 
     def start_all(self) -> None:
+        if self.runtime.settings.caption_source.kind == "translation-program":
+            self.bottom_status.set(self._t("external_languages"))
+            return
         orchestrator = self.startup_orchestrator
         if orchestrator is None:
             if self.runtime.windows_caption_manager:
@@ -1281,6 +1467,9 @@ class YidaApp:
             self._show_result(result)
         if update.errors:
             self.source_status.set(self._t("source_error", detail=update.errors[-1]))
+        backlog = self.runtime.controller.engine.backlog_status()
+        if backlog:
+            self.bottom_status.set(backlog)
         now = time.monotonic()
         if now >= self._next_system_refresh:
             self._refresh_live_status()
@@ -1288,15 +1477,32 @@ class YidaApp:
         self.root.after(self.runtime.settings.caption_source.poll_interval_ms, self._tick)
 
     def _show_caption(self, event: CaptionEvent) -> None:
+        self._update_latest(event)
         if event.event_id in self.pending_cards:
             card = self.pending_cards[event.event_id]
+            card["original"].set(event.source_text)
+            if card.get("source_text") != event.source_text:
+                card["source_text"] = event.source_text
+                card["reply"].set(self._t("reply_pending"))
+                card["reply_button"].state(["disabled"])
+                card["convert_button"].state(["disabled"])
             card["translation"].set(self._translation_text(event))
             button = card["translation_button"]
             button.configure(command=lambda: self._copy_to_clipboard(event.translated_text))
             if event.translated_text:
                 button.state(["!disabled"])
+            else:
+                button.state(["disabled"])
+            self._content_changed()
             return
-        follow_latest = self.timeline.yview()[1] >= .98
+        follow_latest = self._is_following_latest()
+        view_anchor = None
+        if not follow_latest and hasattr(self.timeline, "index"):
+            try:
+                view_anchor = self.timeline.index("@1,1")
+                self.timeline.mark_set("_yida_view_anchor", view_anchor)
+            except Exception:
+                view_anchor = None
         card = ttk.Frame(self.timeline, padding=16, style="Card.TFrame")
         card.columnconfigure(0, weight=1)
         ttk.Label(
@@ -1305,9 +1511,10 @@ class YidaApp:
             foreground="#475467",
             font=("Microsoft YaHei UI", 9, "bold"),
         ).grid(row=0, column=0, sticky="w")
+        original_var = StringVar(value=event.source_text)
         ttk.Label(
             card,
-            text=event.source_text,
+            textvariable=original_var,
             wraplength=920,
             justify="left",
         ).grid(row=1, column=0, sticky="ew", pady=(3, 10))
@@ -1331,7 +1538,10 @@ class YidaApp:
             foreground="#067647",
             font=("Microsoft YaHei UI", 11, "bold"),
         ).grid(row=5, column=0, sticky="w", pady=(8, 2))
-        reply_var = StringVar(value=self._t("ai_waiting"))
+        manual = event.metadata.get("replay") or self.runtime.settings.reply_mode in {
+            "translation", "confirm"
+        }
+        reply_var = StringVar(value=self._t("reply_this" if manual else "reply_pending"))
         ttk.Label(
             card,
             textvariable=reply_var,
@@ -1369,7 +1579,7 @@ class YidaApp:
         ttk.Button(
             buttons,
             text=self._t("copy_source"),
-            command=lambda: self._copy_to_clipboard(event.source_text),
+            command=lambda: self._copy_to_clipboard(original_var.get()),
         ).pack(side="left")
         translation_button = ttk.Button(
             buttons,
@@ -1388,18 +1598,33 @@ class YidaApp:
         )
         convert_button.pack(side="left", padx=6)
         ttk.Button(
+            primary_actions, text=self._t("reply_this"),
+            command=lambda: self.reply_to_card(event.event_id),
+        ).pack(side="left", padx=6)
+        ttk.Button(
             primary_actions, text=self._t("message_details"), command=toggle_details,
         ).pack(side="left")
         for child in card.winfo_children():
             if isinstance(child, ttk.Label):
                 child.configure(style="Card.TLabel")
         self.timeline.configure(state="normal")
-        self.timeline.window_create("end", window=card, padx=8, pady=8)
-        self.timeline.insert("end", "\n")
+        self.timeline.window_create("1.0", window=card, padx=8, pady=8)
+        self.timeline.insert("1.1", "\n")
         self.timeline.configure(state="disabled")
         if follow_latest:
-            self.timeline.see("end")
+            self.timeline.see("1.0")
+        elif view_anchor is not None:
+            try:
+                self.timeline.see("_yida_view_anchor")
+                self.timeline.mark_unset("_yida_view_anchor")
+            except Exception:
+                pass
+            self._mark_new_content()
+        else:
+            self._mark_new_content()
         self.pending_cards[event.event_id] = {
+            "original": original_var,
+            "source_text": event.source_text,
             "translation": translation_var,
             "translation_button": translation_button,
             "frame": card,
@@ -1409,6 +1634,8 @@ class YidaApp:
             "reply_button": reply_button,
             "convert_button": convert_button,
         }
+        self._card_order.append(event.event_id)
+        self._trim_visible_cards()
         if self.runtime.settings.reply_mode == "confirm":
             self.bottom_status.set(self._t("confirm_hint"))
 
@@ -1419,7 +1646,10 @@ class YidaApp:
                 reply_var = card["reply"]
                 assert isinstance(reply_var, StringVar)
                 reply_var.set(self._t("ai_error", detail=result.error))
-            self._set_ai_state(AIConnectionState.NETWORK_ERROR)
+            if result.request.event.event_id == self._latest_event_id:
+                self.latest_reply.set(self._t("ai_error", detail=result.error))
+            self._set_ai_state(state_from_error(result.error_kind)
+                               if result.error_kind else AIConnectionState.NETWORK_ERROR)
             return
         suggestion = result.suggestion
         if suggestion is None:
@@ -1435,6 +1665,58 @@ class YidaApp:
         if result.warning:
             self._write_timeline(f"{self._t('storage_warning', detail=result.warning)}\n", "error")
             self.bottom_status.set(result.warning)
+        self._content_changed()
+
+    def _is_following_latest(self) -> bool:
+        return bool(self.follow_latest.get()) and self.timeline.yview()[0] <= .02
+
+    def _update_latest(self, event: CaptionEvent) -> None:
+        """Keep the newest caption visible independently of history scrolling."""
+        if (
+            self._latest_occurred_at is not None
+            and event.event_id != self._latest_event_id
+            and event.occurred_at < self._latest_occurred_at
+        ):
+            return
+        previous_id = self._latest_event_id
+        self._latest_event_id = event.event_id
+        self._latest_occurred_at = event.occurred_at
+        self.latest_original.set(event.source_text or self._t("latest_waiting"))
+        self.latest_translation.set(self._translation_text(event))
+        if previous_id != event.event_id:
+            self.latest_reply.set(self._t("reply_pending"))
+
+    def _content_changed(self) -> None:
+        if self._is_following_latest():
+            self.timeline.see("1.0")
+            return
+        self._mark_new_content()
+
+    def _mark_new_content(self) -> None:
+        self._new_content_count += 1
+        self.new_content_button.configure(text=f"有 {self._new_content_count} 条新内容")
+        if self._new_content_count > 0:
+            self.new_content_button.pack(side="left", padx=8)
+
+    def _return_to_latest(self) -> None:
+        self.follow_latest.set(True)
+        self.timeline.see("1.0")
+        self._new_content_count = 0
+        self.new_content_button.pack_forget()
+
+    def _follow_setting_changed(self) -> None:
+        if self.follow_latest.get():
+            self._return_to_latest()
+
+    def _on_timeline_scroll(self, _event=None):
+        self.root.after_idle(self._update_follow_state)
+
+    def _update_follow_state(self) -> None:
+        if self.timeline.yview()[0] > .02:
+            self.follow_latest.set(False)
+        elif self.follow_latest.get():
+            self._new_content_count = 0
+            self.new_content_button.pack_forget()
 
     def _translation_text(self, event: CaptionEvent) -> str:
         if event.translated_text:
@@ -1442,6 +1724,17 @@ class YidaApp:
         if event.metadata.get("translation_error"):
             return self._t("translation_failed", detail=event.metadata["translation_error"])
         return self._t("translation_pending")
+
+    def reply_to_card(self, event_id: str) -> None:
+        controller = self.runtime.controller
+        event = next((t.event for t in controller.engine.conversation.turns
+                      if t.event.event_id == event_id), None)
+        if event is None:
+            self.bottom_status.set(self._t("reply_expired"))
+            return
+        controller.pending_confirmation[event_id] = event
+        controller.confirm(event_id)
+        self.bottom_status.set(self._t("reply_pending"))
 
     def _background(self, work, done) -> None:
         results = queue.Queue()
@@ -1488,6 +1781,8 @@ class YidaApp:
     def _show_suggestion(self, event: CaptionEvent, suggestion: ReplySuggestion) -> None:
         card = self.pending_cards.get(event.event_id)
         if card is None:
+            if event.event_id in self._hidden_card_ids:
+                return
             self._show_caption(event)
             card = self.pending_cards[event.event_id]
         reply_var = card["reply"]
@@ -1499,10 +1794,9 @@ class YidaApp:
         assert isinstance(evidence_var, StringVar)
         assert isinstance(reply_button, ttk.Button)
         reply_var.set(suggestion.translated_reply)
-        explanation_var.set(
-            f"{self._t('suggested_reply')}：{suggestion.suggested_reply}\n"
-            f"{self._t('current_question')}：{suggestion.current_question}"
-        )
+        if event.event_id == self._latest_event_id:
+            self.latest_reply.set(suggestion.translated_reply)
+        explanation_var.set(f"{self._t('suggested_reply')}：{suggestion.suggested_reply}")
         if suggestion.citations:
             citation_text = "\n".join(
                 f"• {citation.document_name}：{citation.excerpt.replace(chr(10), ' ')[:240]}"
@@ -1523,6 +1817,18 @@ class YidaApp:
         self.root.clipboard_append(value)
         self.bottom_status.set(self._t("copied"))
 
+    def _trim_visible_cards(self, limit: int = 200) -> None:
+        while len(self._card_order) > limit:
+            event_id = self._card_order.pop(0)
+            card = self.pending_cards.get(event_id)
+            if card is None:
+                continue
+            frame = card.get("frame")
+            if frame is not None:
+                frame.destroy()
+            self.pending_cards.pop(event_id, None)
+            self._hidden_card_ids.add(event_id)
+
     def _render_restored_history(self) -> None:
         if not self.runtime.restored_history:
             return
@@ -1536,12 +1842,12 @@ class YidaApp:
         self.bottom_status.set(self._t("waiting"))
 
     def _write_timeline(self, text: str, tag: str | None = None) -> None:
-        follow_latest = not hasattr(self.timeline, "yview") or self.timeline.yview()[1] >= .98
+        follow_latest = not hasattr(self.timeline, "yview") or self._is_following_latest()
         self.timeline.configure(state="normal")
         self.timeline.insert("end", text, tag or ())
         self.timeline.configure(state="disabled")
         if follow_latest:
-            self.timeline.see("end")
+            self.timeline.see("1.0")
 
     def _refresh_status(self) -> None:
         self._refresh_live_status()
@@ -1559,6 +1865,15 @@ class YidaApp:
         self.reindex()
 
     def _refresh_live_status(self) -> None:
+        if self.runtime.settings.caption_source.kind == "translation-program":
+            status = self.runtime.controller.source.status()
+            label = self._t("ipc_connected" if status.available else "ipc_disconnected")
+            details = {"unconfigured": "ipc_unconfigured", "failed": "ipc_failed",
+                       "paused": "ipc_paused", "ready_waiting_audio": "input_waiting"}
+            if status.detail in details:
+                label += " · " + self._t(details[status.detail])
+            self.source_status.set(label)
+            return
         self._refresh_component_status()
         status = self.runtime.controller.source.status()
         windows_manager = self.runtime.windows_caption_manager
@@ -1659,6 +1974,8 @@ class YidaApp:
 
     def close(self) -> None:
         self._closed = True
+        if self._import_thread and self._import_thread.is_alive():
+            self._import_thread.join(timeout=1.0)
         self.runtime.close()
         self.root.destroy()
 

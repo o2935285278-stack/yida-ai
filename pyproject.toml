@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "yida-ai"
-version = "0.2.4b0"
+version = "0.2.5b0"
 description = "Real-time multilingual knowledge-assisted reply system for Windows Live Captions"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -21,16 +21,16 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
 ]
-dependencies = ["comtypes>=1.4.16; sys_platform == 'win32'", "tkinterdnd2>=0.6.3", "pypdf>=5.0"]
+dependencies = ["comtypes>=1.4.16; sys_platform == 'win32'", "tkinterdnd2>=0.6.3", "pypdf>=6.18.1"]
 
 [project.optional-dependencies]
-pdf = ["pypdf>=5.0"]
+pdf = ["pypdf>=6.18.1"]
 dev = [
   "pytest>=8.3",
   "pytest-cov>=6.0",
   "ruff>=0.9",
   "pyinstaller>=6.11",
-  "pypdf>=5.0",
+  "pypdf>=6.18.1",
 ]
 
 [project.scripts]

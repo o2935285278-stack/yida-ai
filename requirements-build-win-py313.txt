@@ -14,8 +14,8 @@ pyinstaller==6.22.0 \
     --hash=sha256:6e5f3656de100954bf5db25536c43e097e46d482843a96d03a0852bf266e4853
 pyinstaller-hooks-contrib==2026.6 \
     --hash=sha256:fd13b8ac126b35361175edacd41a0d97080b75dd5f4b594ecefefff969509dd3
-pypdf==6.15.0 \
-    --hash=sha256:14e001d6504822cb1ca9c7ed9a69bccb320f59b320730f55af804361abe4d5ee
+pypdf==6.18.1 \
+    --hash=sha256:ee93a2665670ecf57ee81d197a4ca548f3dc15f9cefc56e59b8140866aaa3de5
 pywin32-ctypes==0.2.3 \
     --hash=sha256:8a1513379d709975552d202d942d9837758905c8d01eb82b8bcc30918929e7b8
 setuptools==84.0.0 \

@@ -9,9 +9,13 @@ available as a compatibility option, and
 keeps bounded conversational context, retrieves relevant passages from local
 documents, and asks a user-configured AI provider for a grounded reply.
 
-This is a **v0.2.4-beta development preview** project. It is not a speech-recognition engine and does
+This is a **v0.2.5-beta local development preview** project. It is not a speech-recognition engine and does
 not promise perfect translation or zero latency. The current release candidate
 is **unsigned** and must not be represented as signed.
+
+The optional `translation-program` source subscribes to the standalone translator
+through local IPC-v1, without controlling its process or reading its credentials.
+See [setup and verification limits](docs/RELEASE_NOTES_v0.2.5-beta.md).
 
 The 0.2.4 UI preview simplifies the conversation page and nests diagnostics inside
 Settings. Automatic caption-window hiding is experimental and opt-in; live

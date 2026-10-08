@@ -62,6 +62,7 @@ class AppSettings:
     reply_mode: str = "every"
     reply_length: str = "short"
     context_turns: int = 15
+    follow_latest: bool = True
     interface_language: str = "zh-CN"
     llm: LLMSettings = field(default_factory=LLMSettings)
     caption_source: CaptionSourceSettings = field(default_factory=CaptionSourceSettings)

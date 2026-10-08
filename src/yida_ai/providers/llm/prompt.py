@@ -21,8 +21,9 @@ def build_messages(request: ReplyRequest) -> list[dict[str, str]]:
     history = "\n\n".join(
         (
             f"Turn {index}\n"
-            f"Source ({event.source_language}): {event.source_text}\n"
-            f"Translation ({event.translated_language or 'unknown'}): {event.translated_text}"
+            f"Source ({event.source_language}): {_prompt_text(event.source_text)}\n"
+            f"Translation ({event.translated_language or 'unknown'}): "
+            f"{_prompt_text(event.translated_text)}"
         )
         for index, event in enumerate(request.context, start=1)
     )
@@ -35,6 +36,15 @@ Scene: {scene.name}. Scene instruction: {scene_instruction}
 The user reads {user_language}.
 Write the suggestion in {user_language}, then translate it into {reply_language}.
 {LENGTH_INSTRUCTIONS.get(request.reply_length, LENGTH_INSTRUCTIONS["short"])}
+
+Answering mode:
+- Identify what the other person asked in the latest caption.
+- Write a direct answer that the user can say aloud in first person when appropriate.
+- Return the answer itself; never begin with "You can answer", "建议你说", "As an AI", or
+  an explanation of how to answer.
+- Give the concise answer first and add a brief reason only when it helps.
+- Preserve uncertainty honestly instead of inventing a personal experience, number, promise,
+  or qualification.
 
 Grounding policy:
 - Use document facts only when supported by the supplied sources.
@@ -64,6 +74,15 @@ Recent conversation:
 Relevant document excerpts:
 {citations or "(no matching document excerpt)"}
 
-Answer the latest caption event with a usable suggestion.
+Answer the latest caption event with a usable suggestion. The latest caption is:
+Source ({request.event.source_language}): {_prompt_text(request.event.source_text)}
+Translation ({request.event.translated_language or 'unknown'}):
+{_prompt_text(request.event.translated_text)}
 """.strip()
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+
+
+def _prompt_text(value: str, limit: int = 1200) -> str:
+    if len(value) <= limit:
+        return value
+    return value[:limit].rstrip() + " …[内容过长，已保留开头供上下文判断]"

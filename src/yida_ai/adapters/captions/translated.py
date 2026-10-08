@@ -15,8 +15,12 @@ class TranslatedCaptionSource(CaptionSource):
         self.source = source
         self.translator = translator
         self._pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="yida-translation")
-        self._results: queue.Queue[CaptionEvent] = queue.Queue()
+        # Keep enough completed revisions to absorb a burst without dropping
+        # independent sentences.  Once this bound is reached, new captions
+        # receive an explicit queue-full status instead of disappearing.
+        self._results: queue.Queue[CaptionEvent] = queue.Queue(maxsize=512)
         self._pending = 0
+        self._max_pending = 512
         self._closed = False
 
     def status(self):
@@ -25,10 +29,14 @@ class TranslatedCaptionSource(CaptionSource):
     def poll(self, limit: int = 50) -> list[CaptionEvent]:
         result = []
         for event in self.source.poll(limit):
-            if self._pending >= 64:
-                result.append(replace(event, metadata={"translation_error": "queue-full"}))
+            if self._pending >= self._max_pending:
+                result.append(replace(
+                    event, metadata={**event.metadata, "translation_error": "queue-full"}
+                ))
                 continue
-            result.append(replace(event, metadata={"translation_pending": True}))
+            result.append(replace(
+                event, metadata={**event.metadata, "translation_pending": True}
+            ))
             self._pending += 1
             self._pool.submit(self._translate, event)
         for _ in range(limit):
@@ -49,9 +57,13 @@ class TranslatedCaptionSource(CaptionSource):
         except Exception as exc:
             update = replace(
                 event, revision_of=event.event_id,
-                metadata={"translation_error": str(exc)},
+                metadata={**event.metadata, "translation_error": str(exc)},
             )
         if not self._closed:
+            # The pending bound and result bound are equal, so a full result
+            # queue means the caller has not polled promptly.  Retain the
+            # completed event until the next poll instead of replacing an
+            # unrelated completed sentence.
             self._results.put(update)
 
     def close(self) -> None:
